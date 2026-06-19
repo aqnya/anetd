@@ -1,0 +1,11 @@
+[package]
+name = "anetd"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+arc-swap = "1.9.1"
+byteorder = "1.5.0"
+clap = { version = "4.6.1", features = ["derive"] }
+libc = "0.2.186"
+xattr = "1.6.1"
