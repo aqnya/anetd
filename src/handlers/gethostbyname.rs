@@ -1,66 +1,65 @@
-use log::info;
+use log::{info, trace};
 use std::io;
-use std::net::Ipv4Addr;
-use std::str::FromStr;
 
 use crate::handlers::{CommandCtx, CommandHandler};
+use crate::protocol::ProtoWrite;
+use crate::proxy::{connect_netd, proxy_transparent};
 use crate::rules::FilterAction;
-use crate::server::{ProtoWrite, connect_netd, proxy_transparent};
 
 pub struct GetHostByNameHandler;
 
 impl CommandHandler for GetHostByNameHandler {
-    fn handle(&self, ctx: CommandCtx) -> io::Result<()> {
-        let CommandCtx {
-            client,
-            cmd_line,
-            rules,
-        } = ctx;
+    fn handle<'a>(
+        &'a self,
+        ctx: CommandCtx<'a>,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = io::Result<()>> + Send + 'a>> {
+        Box::pin(async move {
+            let CommandCtx {
+                client,
+                cmd_line,
+                rules,
+            } = ctx;
 
-        let tokens: Vec<&str> = cmd_line.split_whitespace().collect();
-        // 格式：gethostbyname <net_id> <hostname> <ai_family>
-        if tokens.len() < 3 {
-            let mut netd = connect_netd()?;
-            netd.write_cmd(cmd_line)?;
-            return proxy_transparent(client, netd);
-        }
-
-        let net_id = tokens[1];
-        let hostname = tokens[2];
-        let ai_family = tokens.get(3).unwrap_or(&"2"); // 默认 AF_INET = 2
-
-        info!("  hostname (gethostbyname): {hostname}");
-        let rule = rules
-            .iter()
-            .find(|r| r.matches(hostname))
-            .expect("BUG: no catch-all rule in rules list");
-
-        match &rule.action {
-            FilterAction::Block => {
-                crate::dns::send_dns_hard_block(client)?;
-                info!(" BLOCKED (gethostbyname)");
+            let tokens: Vec<&str> = cmd_line.split_whitespace().collect();
+            if tokens.len() < 3 {
+                let mut netd = connect_netd().await?;
+                netd.write_cmd(cmd_line).await?;
+                return proxy_transparent(client, &mut netd).await;
             }
-            FilterAction::Fake(ip) => {
-                if let Ok(addr) = Ipv4Addr::from_str(ip) {
-                    crate::dns::send_hostent_fake_response(client, hostname, addr)?;
-                    info!(" FAKE {ip} (gethostbyname)");
-                } else {
-                    crate::dns::send_dns_hard_block(client)?;
+
+            let net_id = tokens[1];
+            let hostname = tokens[2];
+            let ai_family = tokens.get(3).unwrap_or(&"2");
+
+            trace!("  hostname (gethostbyname): {hostname}");
+
+            let mut pseudo_url = String::with_capacity(9 + hostname.len());
+            pseudo_url.push_str("https://");
+            pseudo_url.push_str(hostname);
+            pseudo_url.push('/');
+
+            let action = rules.matches(&pseudo_url, hostname, "other");
+
+            match &action {
+                FilterAction::Block => {
+                    crate::dns::send_dns_hard_block(client).await?;
+                    info!("[BLOCKED] cmd: \"{}\"", cmd_line.trim());
+                }
+                FilterAction::Redirect(target) => {
+                    let new_cmd = format!("gethostbyname {net_id} {target} {ai_family}");
+                    info!(" REDIRECT to {target} (gethostbyname)");
+                    let mut netd = connect_netd().await?;
+                    netd.write_cmd(&new_cmd).await?;
+                    proxy_transparent(client, &mut netd).await?;
+                }
+                FilterAction::Allow => {
+                    let mut netd = connect_netd().await?;
+                    netd.write_cmd(cmd_line).await?;
+                    proxy_transparent(client, &mut netd).await?;
                 }
             }
-            FilterAction::Redirect(target) => {
-                let new_cmd = format!("gethostbyname {net_id} {target} {ai_family}");
-                info!(" REDIRECT to {target} (gethostbyname)");
-                let mut netd = connect_netd()?;
-                netd.write_cmd(&new_cmd)?;
-                proxy_transparent(client, netd)?;
-            }
-            FilterAction::Allow => {
-                let mut netd = connect_netd()?;
-                netd.write_cmd(cmd_line)?;
-                proxy_transparent(client, netd)?;
-            }
-        }
-        Ok(())
+
+            Ok(())
+        })
     }
 }

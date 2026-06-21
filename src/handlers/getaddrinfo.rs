@@ -1,15 +1,14 @@
-// src/handlers/getaddrinfo.rs
-use log::info;
+use log::{info, trace};
 use std::io;
-use std::net::Ipv4Addr;
-use std::str::FromStr;
 
 use crate::handlers::{CommandCtx, CommandHandler};
 use crate::rules::FilterAction;
-use crate::server::{ProtoWrite, connect_netd, proxy_transparent};
 
-// ... Request 结构体和实现保持不变 ...
+use crate::protocol::ProtoWrite;
+use crate::proxy::{connect_netd, proxy_transparent};
+
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct GetAddrInfoRequest {
     hostname: Option<String>,
     servname: Option<String>,
@@ -18,6 +17,7 @@ struct GetAddrInfoRequest {
     ai_socktype: i32,
     ai_protocol: i32,
     net_id: u32,
+    raw_cmd: String,
 }
 
 impl GetAddrInfoRequest {
@@ -38,81 +38,79 @@ impl GetAddrInfoRequest {
             ai_socktype: tokens[5].parse().ok()?,
             ai_protocol: tokens[6].parse().ok()?,
             net_id: tokens[7].parse().ok()?,
+            raw_cmd: cmd.to_string(),
         })
     }
 
-    fn to_cmd(&self) -> String {
-        format!(
-            "getaddrinfo {} {} {} {} {} {} {}",
-            self.hostname.as_deref().unwrap_or("^"),
-            self.servname.as_deref().unwrap_or("^"),
-            self.ai_flags,
-            self.ai_family,
-            self.ai_socktype,
-            self.ai_protocol,
-            self.net_id,
-        )
+    fn hostname_str(&self) -> &str {
+        self.hostname.as_deref().unwrap_or("")
     }
 
-    fn hostname_str(&self) -> &str {
-        self.hostname.as_deref().unwrap_or("(null)")
+    fn to_redirect_cmd(&self, new_hostname: &str) -> String {
+        let tokens: Vec<&str> = self.raw_cmd.split(' ').collect();
+        let mut parts = tokens.to_vec();
+        parts[1] = new_hostname;
+        parts.join(" ")
     }
 }
 
 pub struct GetAddrInfoHandler;
 
 impl CommandHandler for GetAddrInfoHandler {
-    fn handle(&self, ctx: CommandCtx) -> io::Result<()> {
-        let CommandCtx {
-            client,
-            cmd_line,
-            rules,
-        } = ctx;
+    fn handle<'a>(
+        &'a self,
+        ctx: CommandCtx<'a>,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = io::Result<()>> + Send + 'a>> {
+        Box::pin(async move {
+            let CommandCtx {
+                client,
+                cmd_line,
+                rules,
+            } = ctx;
 
-        let Some(req) = GetAddrInfoRequest::parse(cmd_line) else {
-            info!(" [I] Failed to parse getaddrinfo command, falling back to transparent proxy");
-            let mut netd = connect_netd()?;
-            netd.write_cmd(cmd_line)?;
-            return proxy_transparent(client, netd);
-        };
+            let Some(req) = GetAddrInfoRequest::parse(cmd_line) else {
+                trace!(
+                    " [I] Failed to parse getaddrinfo command, falling back to transparent proxy"
+                );
+                let mut netd = connect_netd().await?;
+                netd.write_cmd(cmd_line).await?;
+                return proxy_transparent(client, &mut netd).await;
+            };
 
-        let hostname = req.hostname_str();
-        info!("  hostname: {hostname}");
+            let hostname = req.hostname_str();
 
-        // 修复：用 expect 明确说明规则不变量
-        let rule = rules
-            .iter()
-            .find(|r| r.matches(hostname))
-            .expect("BUG: no catch-all rule in rules list");
+            let pseudo_url = format_pseudo_url(hostname);
+            let action = rules.matches(&pseudo_url, "", "");
 
-        match &rule.action {
-            FilterAction::Block => {
-                crate::dns::send_dns_hard_block(client)?;
-                info!(" BLOCKED (getaddrinfo)");
-            }
-            FilterAction::Fake(ip) => {
-                if let Ok(addr) = Ipv4Addr::from_str(ip) {
-                    crate::dns::send_addrinfo_fake_response(client, addr)?;
-                    info!(" FAKE {ip} (getaddrinfo)");
-                } else {
-                    crate::dns::send_dns_hard_block(client)?;
-                    info!(" FAKE FAILED (invalid IP), BLOCKED (getaddrinfo)");
+            match &action {
+                FilterAction::Block => {
+                    crate::dns::send_dns_hard_block(client).await?;
+                    info!("[BLOCKED] cmd: \"{}\"", cmd_line.trim());
+                }
+                FilterAction::Redirect(target) => {
+                    let redirect_cmd = req.to_redirect_cmd(target);
+                    info!(" REDIRECT to {target} (getaddrinfo)");
+                    let mut netd = connect_netd().await?;
+                    netd.write_cmd(&redirect_cmd).await?;
+                    proxy_transparent(client, &mut netd).await?;
+                }
+                FilterAction::Allow => {
+                    let mut netd = connect_netd().await?;
+                    netd.write_cmd(cmd_line).await?;
+                    proxy_transparent(client, &mut netd).await?;
                 }
             }
-            FilterAction::Redirect(target) => {
-                let mut new_req = req.clone();
-                new_req.hostname = Some(target.clone());
-                info!(" REDIRECT to {target}");
-                let mut netd = connect_netd()?;
-                netd.write_cmd(&new_req.to_cmd())?;
-                proxy_transparent(client, netd)?;
-            }
-            FilterAction::Allow => {
-                let mut netd = connect_netd()?;
-                netd.write_cmd(cmd_line)?;
-                proxy_transparent(client, netd)?;
-            }
-        }
-        Ok(())
+
+            Ok(())
+        })
     }
+}
+
+#[inline]
+fn format_pseudo_url(hostname: &str) -> String {
+    let mut url = String::with_capacity(9 + hostname.len());
+    url.push_str("https://");
+    url.push_str(hostname);
+    url.push('/');
+    url
 }

@@ -1,26 +1,28 @@
 use std::collections::HashMap;
+use std::future::Future;
 use std::io;
-use std::os::unix::net::UnixStream;
+use std::pin::Pin;
 use std::sync::{Arc, OnceLock};
+use tokio::net::UnixStream;
 
-use crate::rules::FilterRule;
+use crate::rules::RuleSet;
 
 pub mod getaddrinfo;
 pub mod gethostbyaddr;
 pub mod gethostbyname;
 pub mod resnsend;
-pub mod setoperatoraddress;
 
-/// 传递给处理函数的上下文
 pub struct CommandCtx<'a> {
     pub client: &'a mut UnixStream,
     pub cmd_line: &'a str,
-    pub rules: Arc<Vec<FilterRule>>,
+    pub rules: Arc<RuleSet>,
 }
 
-/// 统一的命令处理器接口
 pub trait CommandHandler: Send + Sync {
-    fn handle(&self, ctx: CommandCtx) -> io::Result<()>;
+    fn handle<'a>(
+        &'a self,
+        ctx: CommandCtx<'a>,
+    ) -> Pin<Box<dyn Future<Output = io::Result<()>> + Send + 'a>>;
 }
 
 type HandlerRegistry = HashMap<String, Box<dyn CommandHandler>>;
@@ -42,10 +44,6 @@ pub fn get_registry() -> &'static HandlerRegistry {
         m.insert(
             "gethostbyaddr".to_string(),
             Box::new(gethostbyaddr::GetHostByAddrHandler),
-        );
-        m.insert(
-            "setoperatoraddress".to_string().to_lowercase(),
-            Box::new(setoperatoraddress::SetOperatorAddressHandler),
         );
         m
     })
