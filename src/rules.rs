@@ -3,11 +3,11 @@ use log::{error, info, warn};
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
-use std::time::SystemTime;
 
 use adblock::engine::Engine;
 use adblock::lists::ParseOptions;
 use adblock::request::Request;
+use sha2::{Digest, Sha256};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum FilterAction {
@@ -19,7 +19,7 @@ pub enum FilterAction {
 #[derive(Clone)]
 pub struct RuleSet {
     pub engine: Arc<Engine>,
-    pub watched_files: Vec<(String, SystemTime)>,
+    pub watched_files: Vec<(String, String)>,
 }
 
 impl std::fmt::Debug for RuleSet {
@@ -61,10 +61,17 @@ impl RuleSet {
     }
 }
 
-fn collect_files_and_mtimes(path_str: &str, files: &mut Vec<(String, SystemTime)>) {
+fn calculate_file_hash(path: &Path) -> Option<String> {
+    let bytes = std::fs::read(path).ok()?;
+    let mut hasher = Sha256::new();
+    hasher.update(&bytes);
+    Some(hex::encode(hasher.finalize()))
+}
+
+fn collect_files_and_hashes(path_str: &str, files: &mut Vec<(String, String)>) {
     if path_str.contains(',') {
         for sub_path in path_str.split(',') {
-            collect_files_and_mtimes(sub_path.trim(), files);
+            collect_files_and_hashes(sub_path.trim(), files);
         }
         return;
     }
@@ -76,16 +83,14 @@ fn collect_files_and_mtimes(path_str: &str, files: &mut Vec<(String, SystemTime)
     }
 
     if path.is_file() {
-        if let Ok(metadata) = path.metadata() {
-            if let Ok(mtime) = metadata.modified() {
-                files.push((path_str.to_string(), mtime));
-            }
+        if let Some(hash_str) = calculate_file_hash(path) {
+            files.push((path_str.to_string(), hash_str));
         }
     } else if path.is_dir() {
         if let Ok(entries) = std::fs::read_dir(path) {
             for entry in entries.flatten() {
                 if let Some(s) = entry.path().to_str() {
-                    collect_files_and_mtimes(s, files);
+                    collect_files_and_hashes(s, files);
                 }
             }
         }
@@ -94,7 +99,7 @@ fn collect_files_and_mtimes(path_str: &str, files: &mut Vec<(String, SystemTime)
 
 pub fn load_rules(path_str: &str) -> RuleSet {
     let mut watched_files = Vec::new();
-    collect_files_and_mtimes(path_str, &mut watched_files);
+    collect_files_and_hashes(path_str, &mut watched_files);
 
     if watched_files.is_empty() {
         warn!(
@@ -159,8 +164,6 @@ async fn try_inotify_watcher(
 
     let inotify = Inotify::init()?;
 
-    // Derive watch targets directly from already-loaded watched_files,
-    // eliminating the need for collect_watch_targets().
     for (file_path, _) in &store.load().watched_files {
         let p = Path::new(file_path);
         let watch_target = if p.is_dir() {
@@ -194,20 +197,21 @@ async fn try_inotify_watcher(
         if event.mask.contains(EventMask::ISDIR) {
             continue;
         }
-
-        // Debounce: wait for burst of writes to settle
         tokio::time::sleep(Duration::from_millis(200)).await;
 
         let path_clone = path.clone();
-        let new_rules = tokio::task::spawn_blocking(move || load_rules(&path_clone)).await?;
+        let mut new_rules = tokio::task::spawn_blocking(move || load_rules(&path_clone)).await?;
+        let mut current_files = store.load().watched_files.clone();
 
-        // Skip reload if mtimes are unchanged
-        if new_rules.watched_files == store.load().watched_files {
-            info!("[rules] inotify: no mtime change, skipping reload");
+        new_rules.watched_files.sort_unstable();
+        current_files.sort_unstable();
+
+        if new_rules.watched_files == current_files {
+            info!("[rules] inotify: no content hash change, skipping reload");
             continue;
         }
 
-        info!("[rules] inotify: file change detected, reloading...");
+        info!("[rules] inotify: file content change detected, reloading...");
         store.store(Arc::new(new_rules));
         info!("[rules] reloaded rules successfully");
     }

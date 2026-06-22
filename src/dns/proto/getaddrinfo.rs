@@ -25,8 +25,8 @@ use crate::dns::wire::{write_be32, write_len_and_cstring, write_len_and_data};
 fn sockaddr_in(ip: Ipv4Addr, port: u16) -> [u8; 16] {
     let mut s = [0u8; 16];
     s[0..2].copy_from_slice(&(libc::AF_INET as u16).to_ne_bytes()); // sin_family
-    s[2..4].copy_from_slice(&port.to_be_bytes());                    // sin_port
-    s[4..8].copy_from_slice(&ip.octets());                           // sin_addr
+    s[2..4].copy_from_slice(&port.to_be_bytes()); // sin_port
+    s[4..8].copy_from_slice(&ip.octets()); // sin_addr
     // [8..16] padding = 0
     s
 }
@@ -35,9 +35,9 @@ fn sockaddr_in(ip: Ipv4Addr, port: u16) -> [u8; 16] {
 fn sockaddr_in6(ip: Ipv6Addr, port: u16) -> [u8; 28] {
     let mut s = [0u8; 28];
     s[0..2].copy_from_slice(&(libc::AF_INET6 as u16).to_ne_bytes()); // sin6_family
-    s[2..4].copy_from_slice(&port.to_be_bytes());                     // sin6_port
+    s[2..4].copy_from_slice(&port.to_be_bytes()); // sin6_port
     // sin6_flowinfo [4..8] = 0
-    s[8..24].copy_from_slice(&ip.octets());                           // sin6_addr
+    s[8..24].copy_from_slice(&ip.octets()); // sin6_addr
     // sin6_scope_id [24..28] = 0
     s
 }
