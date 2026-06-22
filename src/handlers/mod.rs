@@ -8,7 +8,6 @@ use tokio::net::UnixStream;
 use crate::rules::RuleSet;
 
 pub mod getaddrinfo;
-pub mod gethostbyaddr;
 pub mod gethostbyname;
 pub mod resnsend;
 
@@ -40,10 +39,6 @@ pub fn get_registry() -> &'static HandlerRegistry {
         m.insert(
             "gethostbyname".to_string(),
             Box::new(gethostbyname::GetHostByNameHandler),
-        );
-        m.insert(
-            "gethostbyaddr".to_string(),
-            Box::new(gethostbyaddr::GetHostByAddrHandler),
         );
         m
     })

@@ -6,6 +6,7 @@ use crate::rules::FilterAction;
 
 use crate::protocol::ProtoWrite;
 use crate::proxy::{connect_netd, proxy_transparent};
+use crate::dns::proto::getaddrinfo;
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
@@ -84,7 +85,7 @@ impl CommandHandler for GetAddrInfoHandler {
 
             match &action {
                 FilterAction::Block => {
-                    crate::dns::send_dns_hard_block(client).await?;
+                    getaddrinfo::send_nxdomain(client).await?;
                     info!("[BLOCKED] cmd: \"{}\"", cmd_line.trim());
                 }
                 FilterAction::Redirect(target) => {

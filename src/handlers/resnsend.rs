@@ -6,6 +6,7 @@ use crate::handlers::{CommandCtx, CommandHandler};
 use crate::protocol::ProtoWrite;
 use crate::proxy::{connect_netd, proxy_transparent};
 use crate::rules::FilterAction;
+use crate::dns::proto::resnsend;
 
 pub struct ResNsendHandler;
 
@@ -55,7 +56,7 @@ impl CommandHandler for ResNsendHandler {
 
             match &action {
                 FilterAction::Block => {
-                    crate::dns::send_resnsend_block(client, &raw_dns).await?;
+                   resnsend::send_block(client, &raw_dns).await?;
                     info!("[BLOCKED] cmd: \"{}\"", cmd_line.trim());
                 }
                 FilterAction::Redirect(target) => {
