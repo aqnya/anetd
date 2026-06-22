@@ -2,6 +2,7 @@ use std::io;
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 
 // see https://cs.android.com/android/platform/superproject/+/android-latest-release:packages/modules/Connectivity/staticlibs/netd/libnetdutils/include/netdutils/ResponseCode.h
+#[allow(dead_code)]
 #[repr(u16)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DnsProxyStatus {
