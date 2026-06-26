@@ -1,10 +1,10 @@
-use std::path::Path;
-use log::{error, info, warn};
-use sha2::{Digest, Sha256};
+use crate::rules::adblock::RuleSet;
 use adblock::engine::Engine;
 use adblock::lists::ParseOptions;
+use log::{error, info, warn};
+use sha2::{Digest, Sha256};
+use std::path::Path;
 use std::sync::Arc;
-use crate::rules::adblock::RuleSet;
 
 fn calculate_file_hash(path: &Path) -> Option<String> {
     let bytes = std::fs::read(path).ok()?;

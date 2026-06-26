@@ -2,11 +2,11 @@ use base64::{Engine, prelude::BASE64_STANDARD};
 use log::{info, trace};
 use std::io;
 
+use crate::dns::proto::resnsend;
 use crate::handlers::{CommandCtx, CommandHandler};
 use crate::protocol::ProtoWrite;
 use crate::proxy::{connect_netd, proxy_transparent};
 use crate::rules::FilterAction;
-use crate::dns::proto::resnsend;
 
 pub struct ResNsendHandler;
 
@@ -56,7 +56,7 @@ impl CommandHandler for ResNsendHandler {
 
             match &action {
                 FilterAction::Block => {
-                   resnsend::send_block(client, &raw_dns).await?;
+                    resnsend::send_block(client, &raw_dns).await?;
                     info!("[BLOCKED] cmd: \"{}\"", cmd_line.trim());
                 }
                 FilterAction::Redirect(target) => {

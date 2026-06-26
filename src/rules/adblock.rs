@@ -1,6 +1,6 @@
-use std::sync::Arc;
 use adblock::engine::Engine;
 use adblock::request::Request;
+use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum FilterAction {

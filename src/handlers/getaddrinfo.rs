@@ -4,9 +4,9 @@ use std::io;
 use crate::handlers::{CommandCtx, CommandHandler};
 use crate::rules::FilterAction;
 
+use crate::dns::proto::getaddrinfo;
 use crate::protocol::ProtoWrite;
 use crate::proxy::{connect_netd, proxy_transparent};
-use crate::dns::proto::getaddrinfo;
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]

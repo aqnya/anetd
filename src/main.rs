@@ -10,9 +10,34 @@ pub mod signal;
 use clap::Parser;
 use daemonize::Daemonize;
 use log::error;
-use std::fs::OpenOptions;
-use std::io::BufWriter;
 use tracing_subscriber::fmt;
+
+macro_rules! BASE_DIR {
+    () => {
+        "/data/adb/modules/anetd"
+    };
+}
+macro_rules! LOG_DIR {
+    () => {
+        concat!(BASE_DIR!(), "/log")
+    };
+}
+
+macro_rules! PATH_OUT {
+    () => {
+        concat!(LOG_DIR!(), "/anetd.out")
+    };
+}
+macro_rules! PATH_ERR {
+    () => {
+        concat!(LOG_DIR!(), "/anetd.err")
+    };
+}
+macro_rules! PATH_PID {
+    () => {
+        concat!(LOG_DIR!(), "/anetd.pid")
+    };
+}
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -57,13 +82,13 @@ fn main() -> std::io::Result<()> {
 }
 
 fn start_daemon() {
-    let stdout = std::fs::File::create("/data/adb/modules/anetd/log/anetd.out").unwrap();
-    let stderr = std::fs::File::create("/data/adb/modules/anetd/log/anetd.err").unwrap();
+    let stdout = std::fs::File::create(PATH_OUT!()).unwrap();
+    let stderr = std::fs::File::create(PATH_ERR!()).unwrap();
 
     let daemonize = Daemonize::new()
-        .pid_file("/data/adb/modules/anetd/log/anetd.pid")
+        .pid_file(PATH_PID!())
         .chown_pid_file(true)
-        .working_directory("/data/adb/modules/anetd")
+        .working_directory(BASE_DIR!())
         .stdout(stdout)
         .stderr(stderr);
 
@@ -78,24 +103,26 @@ fn start_daemon() {
 
 fn init_logger(standalone: bool) -> Option<tracing_appender::non_blocking::WorkerGuard> {
     if standalone {
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open("/data/adb/modules/anetd/log/app.log")
-            .expect("can't create app.log");
+        let file_appender = tracing_appender::rolling::Builder::new()
+            .rotation(tracing_appender::rolling::Rotation::DAILY)
+            .filename_prefix("app.log")
+            .max_log_files(7)
+            .build(LOG_DIR!())
+            .expect("failed to create log appender");
 
-        let buffered_writer = BufWriter::with_capacity(2 * 1024 * 1024, file);
-        let (non_blocking_writer, guard) = tracing_appender::non_blocking(buffered_writer);
+        let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
 
         fmt()
             .with_target(false)
-            .with_writer(non_blocking_writer)
             .with_ansi(false)
+            .with_level(true)
+            .with_thread_ids(false)
+            .with_writer(non_blocking)
             .init();
 
         Some(guard)
     } else {
-        fmt().with_target(false).with_writer(std::io::stdout).init();
+        fmt().with_target(true).with_writer(std::io::stdout).init();
 
         None
     }

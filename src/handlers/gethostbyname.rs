@@ -1,11 +1,11 @@
 use log::{info, trace};
 use std::io;
 
+use crate::dns::proto::getaddrinfo;
 use crate::handlers::{CommandCtx, CommandHandler};
 use crate::protocol::ProtoWrite;
 use crate::proxy::{connect_netd, proxy_transparent};
 use crate::rules::FilterAction;
-use crate::dns::proto::getaddrinfo;
 
 pub struct GetHostByNameHandler;
 
