@@ -14,7 +14,7 @@ use tracing_subscriber::fmt;
 
 macro_rules! BASE_DIR {
     () => {
-        "/data/adb/modules/anetd"
+        "/data/adb/anetd"
     };
 }
 macro_rules! LOG_DIR {
@@ -55,6 +55,7 @@ struct Args {
 }
 
 fn main() -> std::io::Result<()> {
+    std::fs::create_dir_all(LOG_DIR!())?;
     let args = Args::parse();
 
     if args.standalone {
