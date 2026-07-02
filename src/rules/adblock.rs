@@ -6,7 +6,6 @@ use std::sync::Arc;
 pub enum FilterAction {
     Allow,
     Block,
-    Redirect(String),
 }
 
 #[derive(Clone)]
@@ -44,9 +43,6 @@ impl RuleSet {
         if result.matched {
             if result.exception.is_some() {
                 return FilterAction::Allow;
-            }
-            if let Some(redirect_url) = result.redirect {
-                return FilterAction::Redirect(redirect_url);
             }
             FilterAction::Block
         } else {

@@ -28,9 +28,9 @@ impl CommandHandler for GetHostByNameHandler {
                 return proxy_transparent(client, &mut netd).await;
             }
 
-            let net_id = tokens[1];
+            let _net_id = tokens[1];
             let hostname = tokens[2];
-            let ai_family = tokens.get(3).unwrap_or(&"2");
+            let _ai_family = tokens.get(3).unwrap_or(&"2");
 
             trace!("  hostname (gethostbyname): {hostname}");
 
@@ -45,13 +45,6 @@ impl CommandHandler for GetHostByNameHandler {
                 FilterAction::Block => {
                     getaddrinfo::send_nxdomain(client).await?;
                     info!("[BLOCKED] cmd: \"{}\"", cmd_line.trim());
-                }
-                FilterAction::Redirect(target) => {
-                    let new_cmd = format!("gethostbyname {net_id} {target} {ai_family}");
-                    info!(" REDIRECT to {target} (gethostbyname)");
-                    let mut netd = connect_netd().await?;
-                    netd.write_cmd(&new_cmd).await?;
-                    proxy_transparent(client, &mut netd).await?;
                 }
                 FilterAction::Allow => {
                     let mut netd = connect_netd().await?;

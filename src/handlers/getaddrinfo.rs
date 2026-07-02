@@ -46,13 +46,6 @@ impl GetAddrInfoRequest {
     fn hostname_str(&self) -> &str {
         self.hostname.as_deref().unwrap_or("")
     }
-
-    fn to_redirect_cmd(&self, new_hostname: &str) -> String {
-        let tokens: Vec<&str> = self.raw_cmd.split(' ').collect();
-        let mut parts = tokens.to_vec();
-        parts[1] = new_hostname;
-        parts.join(" ")
-    }
 }
 
 pub struct GetAddrInfoHandler;
@@ -87,13 +80,6 @@ impl CommandHandler for GetAddrInfoHandler {
                 FilterAction::Block => {
                     getaddrinfo::send_nxdomain(client).await?;
                     info!("[BLOCKED] cmd: \"{}\"", cmd_line.trim());
-                }
-                FilterAction::Redirect(target) => {
-                    let redirect_cmd = req.to_redirect_cmd(target);
-                    info!(" REDIRECT to {target} (getaddrinfo)");
-                    let mut netd = connect_netd().await?;
-                    netd.write_cmd(&redirect_cmd).await?;
-                    proxy_transparent(client, &mut netd).await?;
                 }
                 FilterAction::Allow => {
                     let mut netd = connect_netd().await?;
