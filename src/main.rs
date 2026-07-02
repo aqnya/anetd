@@ -7,7 +7,6 @@ pub mod protocol;
 pub mod proxy;
 pub mod signal;
 
-use clap::Parser;
 use daemonize::Daemonize;
 use log::error;
 use tracing_subscriber::fmt;
@@ -39,24 +38,81 @@ macro_rules! PATH_PID {
     };
 }
 
-#[derive(Parser, Debug)]
+#[derive(Debug)]
 struct Args {
     /// Path to rule file(s) or directory. Supports comma-separated values
-    #[arg(short, long, value_name = "PATH")]
     config: String,
 
     /// Run as a background daemon and log to file
-    #[arg(short, long, default_value_t = false)]
     standalone: bool,
 
     /// enable multi thread
-    #[arg(short, long, default_value_t = false)]
     multi_thread: bool,
 }
 
+fn print_help() {
+    println!(
+        "Usage: anetd --config <PATH> [OPTIONS]
+
+Options:
+  -c, --config <PATH>     Path to rule file(s) or directory. Supports comma-separated values
+  -s, --standalone        Run as a background daemon and log to file
+  -m, --multi-thread      Enable multi thread
+  -h, --help              Print help"
+    );
+}
+
+fn parse_args() -> Args {
+    let mut config: Option<String> = None;
+    let mut standalone = false;
+    let mut multi_thread = false;
+
+    let mut it = std::env::args().skip(1);
+    while let Some(arg) = it.next() {
+        match arg.as_str() {
+            "-c" | "--config" => {
+                let val = it.next().unwrap_or_else(|| {
+                    eprintln!("error: --config requires a value");
+                    std::process::exit(1);
+                });
+                config = Some(val);
+            }
+            s if s.starts_with("--config=") => {
+                config = Some(s["--config=".len()..].to_string());
+            }
+            s if s.starts_with("-c=") => {
+                config = Some(s["-c=".len()..].to_string());
+            }
+            "-s" | "--standalone" => standalone = true,
+            "-m" | "--multi-thread" => multi_thread = true,
+            "-h" | "--help" => {
+                print_help();
+                std::process::exit(0);
+            }
+            other => {
+                eprintln!("error: unrecognized argument '{}'", other);
+                print_help();
+                std::process::exit(1);
+            }
+        }
+    }
+
+    let config = config.unwrap_or_else(|| {
+        eprintln!("error: the following required argument was not provided: --config <PATH>");
+        print_help();
+        std::process::exit(1);
+    });
+
+    Args {
+        config,
+        standalone,
+        multi_thread,
+    }
+}
+
 fn main() -> std::io::Result<()> {
+    let args = parse_args();
     std::fs::create_dir_all(LOG_DIR!())?;
-    let args = Args::parse();
 
     if args.standalone {
         start_daemon();

@@ -4,12 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-adblock = { version = "0.12.5", default-features = false, features = ["full-regex-handling", "content-blocking","embedded-domain-resolver"] }
+adblock = { version = "0.12.5", default-features = false, features = ["embedded-domain-resolver"] }
 arc-swap = "1.9.1"
 base64 = "0.22.1"
-clap = { version = "4.6.1", features = ["derive"] }
 daemonize = "0.5.0"
-hex = "0.4.3"
 inotify = "0.11.2"
 libc = "0.2.186"
 log = "0.4.32"

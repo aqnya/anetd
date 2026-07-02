@@ -10,7 +10,7 @@ fn calculate_file_hash(path: &Path) -> Option<String> {
     let bytes = std::fs::read(path).ok()?;
     let mut hasher = Sha256::new();
     hasher.update(&bytes);
-    Some(hex::encode(hasher.finalize()))
+    Some(hasher.finalize().iter().map(|b| format!("{b:02x}")).collect())
 }
 
 fn collect_files_and_hashes(path_str: &str, files: &mut Vec<(String, String)>) {
