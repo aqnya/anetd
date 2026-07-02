@@ -8,7 +8,7 @@ pub mod proxy;
 pub mod signal;
 
 use daemonize::Daemonize;
-use log::error;
+use tracing::error;
 use tracing_subscriber::fmt;
 
 macro_rules! BASE_DIR {

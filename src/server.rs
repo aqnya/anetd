@@ -1,10 +1,10 @@
 use arc_swap::ArcSwap;
-use log::{error, info, warn};
 use std::io::{self, ErrorKind};
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::UnixListener as StdUnixListener;
 use std::sync::Arc;
 use tokio::net::UnixListener;
+use tracing::{error, info, warn};
 
 use crate::proxy::handle_client;
 use crate::rules::{RuleSet, load_rules, spawn_reload_watcher};

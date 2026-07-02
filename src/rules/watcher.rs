@@ -1,8 +1,8 @@
 use arc_swap::ArcSwap;
-use log::{info, warn};
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
+use tracing::{info, warn};
 
 use crate::rules::adblock::RuleSet;
 use crate::rules::loader::load_rules;

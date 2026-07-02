@@ -1,6 +1,6 @@
 use base64::{Engine, prelude::BASE64_STANDARD};
-use log::{info, trace};
 use std::io;
+use tracing::{info, trace};
 
 use crate::dns::proto::resnsend;
 use crate::handlers::{CommandCtx, CommandHandler};

@@ -1,16 +1,22 @@
 use crate::rules::adblock::RuleSet;
 use adblock::engine::Engine;
 use adblock::lists::ParseOptions;
-use log::{error, info, warn};
 use sha2::{Digest, Sha256};
 use std::path::Path;
 use std::sync::Arc;
+use tracing::{error, info, warn};
 
 fn calculate_file_hash(path: &Path) -> Option<String> {
     let bytes = std::fs::read(path).ok()?;
     let mut hasher = Sha256::new();
     hasher.update(&bytes);
-    Some(hasher.finalize().iter().map(|b| format!("{b:02x}")).collect())
+    Some(
+        hasher
+            .finalize()
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect(),
+    )
 }
 
 fn collect_files_and_hashes(path_str: &str, files: &mut Vec<(String, String)>) {

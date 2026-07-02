@@ -1,8 +1,8 @@
-use log::{error, trace};
 use std::io::{self, ErrorKind};
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::net::UnixStream;
+use tracing::{error, trace};
 
 use crate::handlers::{CommandCtx, get_registry};
 use crate::protocol::ProtoWrite;

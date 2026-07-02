@@ -1,5 +1,5 @@
-use log::{info, trace};
 use std::io;
+use tracing::{info, trace};
 
 use crate::handlers::{CommandCtx, CommandHandler};
 use crate::rules::FilterAction;
