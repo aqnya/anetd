@@ -55,6 +55,36 @@ pub async fn read_be32(r: &mut (impl tokio::io::AsyncRead + Unpin)) -> io::Resul
     Ok(i32::from_be_bytes(buf))
 }
 
+/// Parses the QNAME field from the question section of a raw DNS query packet.
+/// Returns the hostname as a dot-separated string, or None if the packet is malformed.
+pub fn parse_dns_query_name(packet: &[u8]) -> Option<String> {
+    if packet.len() < 12 {
+        return None;
+    }
+    let mut pos = 12;
+    let mut parts = Vec::new();
+    loop {
+        if pos >= packet.len() {
+            return None;
+        }
+        let len = packet[pos] as usize;
+        if len == 0 {
+            break;
+        }
+        if (len & 0xC0) != 0 {
+            return None;
+        }
+        pos += 1;
+        if pos + len > packet.len() {
+            return None;
+        }
+        let label = std::str::from_utf8(&packet[pos..pos + len]).ok()?;
+        parts.push(label);
+        pos += len;
+    }
+    Some(parts.join("."))
+}
+
 /// Reads a length-prefixed byte buffer: reads be32(len), then reads exactly len bytes.
 /// Returns an empty Vec if len <= 0 without reading further.
 /// Returns an error if len exceeds MAX_DNS_PAYLOAD to prevent OOM from malformed input.

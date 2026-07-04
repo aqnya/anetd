@@ -2,11 +2,12 @@ use base64::{Engine, prelude::BASE64_STANDARD};
 use std::io;
 use tracing::{info, trace};
 
-use crate::dns::proto::resnsend;
-use crate::handlers::{CommandCtx, CommandHandler};
+use crate::dns::response::raw;
+use crate::dns::wire::parse_dns_query_name;
+use crate::handlers::{CommandCtx, CommandHandler, format_pseudo_url};
 use crate::protocol::ProtoWrite;
-use crate::proxy::{connect_netd, proxy_transparent};
 use crate::rules::FilterAction;
+use crate::session::{connect_netd, proxy_transparent};
 
 pub struct ResNsendHandler;
 
@@ -47,16 +48,13 @@ impl CommandHandler for ResNsendHandler {
 
             trace!("  hostname (resnsend): {hostname}");
 
-            let mut pseudo_url = String::with_capacity(9 + hostname.len());
-            pseudo_url.push_str("https://");
-            pseudo_url.push_str(&hostname);
-            pseudo_url.push('/');
+            let pseudo_url = format_pseudo_url(&hostname);
 
             let action = rules.matches(&pseudo_url, &hostname, "other");
 
             match &action {
                 FilterAction::Block => {
-                    resnsend::send_block(client, &raw_dns).await?;
+                    raw::send_block(client, &raw_dns).await?;
                     info!("[BLOCKED] cmd: \"{}\"", cmd_line.trim());
                 }
                 FilterAction::Allow => {
@@ -70,30 +68,3 @@ impl CommandHandler for ResNsendHandler {
     }
 }
 
-fn parse_dns_query_name(packet: &[u8]) -> Option<String> {
-    if packet.len() < 12 {
-        return None;
-    }
-    let mut pos = 12;
-    let mut parts = Vec::new();
-    loop {
-        if pos >= packet.len() {
-            return None;
-        }
-        let len = packet[pos] as usize;
-        if len == 0 {
-            break;
-        }
-        if (len & 0xC0) != 0 {
-            return None;
-        }
-        pos += 1;
-        if pos + len > packet.len() {
-            return None;
-        }
-        let label = std::str::from_utf8(&packet[pos..pos + len]).ok()?;
-        parts.push(label);
-        pos += len;
-    }
-    Some(parts.join("."))
-}

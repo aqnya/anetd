@@ -1,7 +1,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
-pub const PROXY_SOCKET: &str = "/dev/socket/dnsproxyd";
-pub const REAL_SOCKET: &str = "/dev/socket/dnsproxyd_real";
+use crate::config::{PROXY_SOCKET, REAL_SOCKET};
 
 pub static ORIGINAL_SOCKET_RENAMED: AtomicBool = AtomicBool::new(false);
 

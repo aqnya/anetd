@@ -43,3 +43,14 @@ pub fn get_registry() -> &'static HandlerRegistry {
         m
     })
 }
+
+/// Build a pseudo-URL from a hostname for adblock rule matching.
+/// Format: "https://<hostname>/"
+#[inline]
+pub fn format_pseudo_url(hostname: &str) -> String {
+    let mut url = String::with_capacity(9 + hostname.len());
+    url.push_str("https://");
+    url.push_str(hostname);
+    url.push('/');
+    url
+}

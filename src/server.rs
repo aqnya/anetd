@@ -1,14 +1,18 @@
 use arc_swap::ArcSwap;
 use std::io::{self, ErrorKind};
+use std::net::SocketAddr;
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::UnixListener as StdUnixListener;
 use std::sync::Arc;
 use tokio::net::UnixListener;
 use tracing::{error, info, warn};
 
-use crate::proxy::handle_client;
+use crate::cli::Args;
+use crate::config::{PROXY_SOCKET, REAL_SOCKET};
+use crate::dns_server;
 use crate::rules::{RuleSet, load_rules, spawn_reload_watcher};
-use crate::signal::{ORIGINAL_SOCKET_RENAMED, PROXY_SOCKET, REAL_SOCKET, setup_signals};
+use crate::session::handle_client;
+use crate::signal::{ORIGINAL_SOCKET_RENAMED, setup_signals};
 
 fn setup_socket_permissions() -> io::Result<()> {
     #[cfg(unix)]
@@ -27,12 +31,29 @@ fn setup_socket_permissions() -> io::Result<()> {
     Ok(())
 }
 
-pub async fn init(rules_path: String) -> io::Result<()> {
+pub async fn init(args: &Args) -> io::Result<()> {
     setup_signals();
 
     static RULES: std::sync::OnceLock<ArcSwap<RuleSet>> = std::sync::OnceLock::new();
-    let store = RULES.get_or_init(|| ArcSwap::new(Arc::new(load_rules(&rules_path.clone()))));
-    spawn_reload_watcher(rules_path.clone(), store);
+    let store = RULES.get_or_init(|| ArcSwap::new(Arc::new(load_rules(&args.config))));
+    spawn_reload_watcher(args.config.clone(), store);
+
+    // Start the built-in DNS server if enabled
+    if args.dns_server {
+        let bind_addr: SocketAddr = format!("0.0.0.0:{}", args.dns_port)
+            .parse()
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
+        let upstream: SocketAddr = args
+            .dns_upstream
+            .parse()
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
+
+        info!(
+            "Starting DNS server on port {}, upstream {}",
+            args.dns_port, args.dns_upstream
+        );
+        tokio::spawn(dns_server::run(bind_addr, upstream, store));
+    }
 
     if std::path::Path::new(REAL_SOCKET).exists() {
         warn!("{} already exists, removing", REAL_SOCKET);

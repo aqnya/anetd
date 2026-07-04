@@ -1,11 +1,11 @@
 use std::io;
 use tracing::{info, trace};
 
-use crate::dns::proto::getaddrinfo;
-use crate::handlers::{CommandCtx, CommandHandler};
+use crate::dns::response::addrinfo;
+use crate::handlers::{CommandCtx, CommandHandler, format_pseudo_url};
 use crate::protocol::ProtoWrite;
-use crate::proxy::{connect_netd, proxy_transparent};
 use crate::rules::FilterAction;
+use crate::session::{connect_netd, proxy_transparent};
 
 pub struct GetHostByNameHandler;
 
@@ -34,16 +34,13 @@ impl CommandHandler for GetHostByNameHandler {
 
             trace!("  hostname (gethostbyname): {hostname}");
 
-            let mut pseudo_url = String::with_capacity(9 + hostname.len());
-            pseudo_url.push_str("https://");
-            pseudo_url.push_str(hostname);
-            pseudo_url.push('/');
+            let pseudo_url = format_pseudo_url(hostname);
 
             let action = rules.matches(&pseudo_url, hostname, "other");
 
             match &action {
                 FilterAction::Block => {
-                    getaddrinfo::send_nxdomain(client).await?;
+                    addrinfo::send_nxdomain(client).await?;
                     info!("[BLOCKED] cmd: \"{}\"", cmd_line.trim());
                 }
                 FilterAction::Allow => {

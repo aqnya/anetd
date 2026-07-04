@@ -4,10 +4,10 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::net::UnixStream;
 use tracing::{error, trace};
 
+use crate::config::REAL_SOCKET;
 use crate::handlers::{CommandCtx, get_registry};
 use crate::protocol::ProtoWrite;
 use crate::rules::RuleSet;
-use crate::signal::REAL_SOCKET;
 
 pub(crate) async fn connect_netd() -> io::Result<UnixStream> {
     UnixStream::connect(REAL_SOCKET).await.map_err(|e| {
