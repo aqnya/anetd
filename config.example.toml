@@ -1,0 +1,6 @@
+   rules = "/data/adb/anetd/rules"
+   standalone = false
+   multi_thread = true
+   dns_server = true
+   dns_port = 53
+   dns_upstream = "8.8.8.8:53"
