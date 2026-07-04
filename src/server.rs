@@ -35,11 +35,11 @@ pub async fn init(args: &Args) -> io::Result<()> {
     setup_signals();
 
     static RULES: std::sync::OnceLock<ArcSwap<RuleSet>> = std::sync::OnceLock::new();
-    let store = RULES.get_or_init(|| ArcSwap::new(Arc::new(load_rules(&args.config))));
-    spawn_reload_watcher(args.config.clone(), store);
+    let store = RULES.get_or_init(|| ArcSwap::new(Arc::new(load_rules(&args.rules))));
+    spawn_reload_watcher(args.rules.clone(), store);
 
-    // Start the built-in DNS server if enabled
     if args.dns_server {
+        // Built-in DNS server mode (UDP/TCP on the specified port)
         let bind_addr: SocketAddr = format!("0.0.0.0:{}", args.dns_port)
             .parse()
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
@@ -52,42 +52,45 @@ pub async fn init(args: &Args) -> io::Result<()> {
             "Starting DNS server on port {}, upstream {}",
             args.dns_port, args.dns_upstream
         );
-        tokio::spawn(dns_server::run(bind_addr, upstream, store));
-    }
+        dns_server::run(bind_addr, upstream, store).await?;
+    } else {
+        // Socket-hijacking mode: intercept netd dnsproxyd socket
+        if std::path::Path::new(REAL_SOCKET).exists() {
+            warn!("{} already exists, removing", REAL_SOCKET);
+            std::fs::remove_file(REAL_SOCKET)?;
+        }
 
-    if std::path::Path::new(REAL_SOCKET).exists() {
-        warn!("{} already exists, removing", REAL_SOCKET);
-        std::fs::remove_file(REAL_SOCKET)?;
-    }
+        std::fs::rename(PROXY_SOCKET, REAL_SOCKET)?;
+        ORIGINAL_SOCKET_RENAMED.store(true, std::sync::atomic::Ordering::SeqCst);
 
-    std::fs::rename(PROXY_SOCKET, REAL_SOCKET)?;
-    ORIGINAL_SOCKET_RENAMED.store(true, std::sync::atomic::Ordering::SeqCst);
+        let std_listener = StdUnixListener::bind(PROXY_SOCKET)?;
+        setup_socket_permissions()?;
 
-    let std_listener = StdUnixListener::bind(PROXY_SOCKET)?;
-    setup_socket_permissions()?;
+        std_listener.set_nonblocking(true)?;
+        let listener = UnixListener::from_std(std_listener)?;
 
-    std_listener.set_nonblocking(true)?;
-    let listener = UnixListener::from_std(std_listener)?;
+        info!("listening on {PROXY_SOCKET}");
+        info!("[*] forwarding to {REAL_SOCKET}");
 
-    info!("listening on {PROXY_SOCKET}");
-    info!("[*] forwarding to {REAL_SOCKET}");
-
-    loop {
-        match listener.accept().await {
-            Ok((client, _addr)) => {
-                let rules = store.load_full();
-                tokio::spawn(async move {
-                    if let Err(e) = handle_client(client, rules).await {
-                        if e.kind() != ErrorKind::UnexpectedEof
-                            && e.kind() != ErrorKind::BrokenPipe
-                            && e.kind() != ErrorKind::ConnectionReset
-                        {
-                            error!("[client error] {e}");
+        loop {
+            match listener.accept().await {
+                Ok((client, _addr)) => {
+                    let rules = store.load_full();
+                    tokio::spawn(async move {
+                        if let Err(e) = handle_client(client, rules).await {
+                            if e.kind() != ErrorKind::UnexpectedEof
+                                && e.kind() != ErrorKind::BrokenPipe
+                                && e.kind() != ErrorKind::ConnectionReset
+                            {
+                                error!("[client error] {e}");
+                            }
                         }
-                    }
-                });
+                    });
+                }
+                Err(e) => error!("[accept error] {e}"),
             }
-            Err(e) => error!("[accept error] {e}"),
         }
     }
+
+    Ok(())
 }

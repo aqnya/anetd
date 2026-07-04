@@ -1,8 +1,13 @@
-/// Base directory for anetd runtime data (logs, pid).
+use serde::Deserialize;
+
+/// Base directory for anetd runtime data (logs, pid, config).
 pub const BASE_DIR: &str = "/data/adb/anetd";
 
 /// Log directory (subdirectory of BASE_DIR).
 pub const LOG_DIR: &str = "/data/adb/anetd/log";
+
+/// Default config file path.
+pub const DEFAULT_CONFIG_FILE: &str = "/data/adb/anetd/config.toml";
 
 /// Stdout log file path.
 pub const PATH_OUT: &str = "/data/adb/anetd/log/anetd.out";
@@ -24,3 +29,41 @@ pub const DNS_SERVER_PORT: u16 = 53;
 
 /// Default upstream DNS server address.
 pub const DNS_UPSTREAM: &str = "8.8.8.8:53";
+
+/// Settings loadable from a TOML configuration file.
+///
+/// All fields are optional; CLI arguments override file values.
+#[derive(Debug, Deserialize)]
+pub struct ConfigFile {
+    /// Path to rule file(s) or directory (same as `--rules` CLI arg).
+    pub rules: Option<String>,
+    /// Run as a background daemon.
+    #[serde(default)]
+    pub standalone: bool,
+    /// Enable multi-thread Tokio runtime.
+    #[serde(default)]
+    pub multi_thread: bool,
+    /// Enable built-in DNS server.
+    #[serde(default)]
+    pub dns_server: bool,
+    /// DNS server listen port.
+    #[serde(default = "default_dns_port")]
+    pub dns_port: u16,
+    /// Upstream DNS server address.
+    #[serde(default = "default_dns_upstream")]
+    pub dns_upstream: String,
+}
+
+fn default_dns_port() -> u16 {
+    DNS_SERVER_PORT
+}
+
+fn default_dns_upstream() -> String {
+    DNS_UPSTREAM.to_string()
+}
+
+/// Load configuration from a TOML file.
+pub fn load_config_file(path: &str) -> Result<ConfigFile, Box<dyn std::error::Error>> {
+    let contents = std::fs::read_to_string(path)?;
+    Ok(toml::from_str(&contents)?)
+}

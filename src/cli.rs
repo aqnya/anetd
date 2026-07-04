@@ -1,9 +1,9 @@
-use crate::config::{DNS_SERVER_PORT, DNS_UPSTREAM};
+use crate::config::{self, DEFAULT_CONFIG_FILE, DNS_SERVER_PORT, DNS_UPSTREAM};
 
 #[derive(Debug)]
 pub struct Args {
     /// Path to rule file(s) or directory. Supports comma-separated values
-    pub config: String,
+    pub rules: String,
 
     /// Run as a background daemon and log to file
     pub standalone: bool,
@@ -23,71 +23,104 @@ pub struct Args {
 
 fn print_help() {
     println!(
-        "Usage: anetd --config <PATH> [OPTIONS]
+        "Usage: anetd --rules <PATH> [OPTIONS]
 
 Options:
-  -c, --config <PATH>       Path to rule file(s) or directory. Supports comma-separated values
-  -s, --standalone          Run as a background daemon and log to file
-  -m, --multi-thread        Enable multi thread
-      --dns-server          Enable built-in DNS server (UDP/TCP)
-      --dns-port <PORT>     DNS server listen port (default: 53)
-      --dns-upstream <ADDR> Upstream DNS server address (default: 8.8.8.8:53)
-  -h, --help                Print help"
+  -r, --rules <PATH>         Path to rule file(s) or directory. Supports comma-separated values
+  -f, --config-file <PATH>   Path to TOML configuration file (default: /data/adb/anetd/config.toml)
+  -s, --standalone           Run as a background daemon and log to file
+  -m, --multi-thread         Enable multi thread
+      --dns-server           Enable built-in DNS server (UDP/TCP)
+      --dns-port <PORT>      DNS server listen port (default: 53)
+      --dns-upstream <ADDR>  Upstream DNS server address (default: 8.8.8.8:53)
+  -h, --help                 Print help"
     );
 }
 
+/// Parse CLI arguments, load optional config file, and merge into a final `Args`.
+///
+/// Precedence: CLI args > config file > hardcoded defaults.
+/// The only required value is `rules` (rule files path), which may come from either
+/// `--rules` or the config file's `rules` key.
 pub fn parse_args() -> Args {
-    let mut config: Option<String> = None;
+    // --- CLI parsing: track explicitly-set values ---
+    let mut rules: Option<String> = None;
+    let mut config_file: Option<String> = None;
     let mut standalone = false;
+    let mut standalone_set = false;
     let mut multi_thread = false;
+    let mut multi_thread_set = false;
     let mut dns_server = false;
-    let mut dns_port: u16 = DNS_SERVER_PORT;
-    let mut dns_upstream: String = DNS_UPSTREAM.to_string();
+    let mut dns_server_set = false;
+    let mut dns_port: Option<u16> = None;
+    let mut dns_upstream: Option<String> = None;
 
     let mut it = std::env::args().skip(1);
     while let Some(arg) = it.next() {
         match arg.as_str() {
-            "-c" | "--config" => {
+            "-r" | "--rules" => {
                 let val = it.next().unwrap_or_else(|| {
-                    eprintln!("error: --config requires a value");
+                    eprintln!("error: --rules requires a value");
                     std::process::exit(1);
                 });
-                config = Some(val);
+                rules = Some(val);
             }
-            s if s.starts_with("--config=") => {
-                config = Some(s["--config=".len()..].to_string());
+            s if s.starts_with("--rules=") => {
+                rules = Some(s["--rules=".len()..].to_string());
             }
-            s if s.starts_with("-c=") => {
-                config = Some(s["-c=".len()..].to_string());
+            s if s.starts_with("-r=") => {
+                rules = Some(s["-r=".len()..].to_string());
             }
-            "-s" | "--standalone" => standalone = true,
-            "-m" | "--multi-thread" => multi_thread = true,
-            "--dns-server" => dns_server = true,
+            "-f" | "--config-file" => {
+                let val = it.next().unwrap_or_else(|| {
+                    eprintln!("error: --config-file requires a value");
+                    std::process::exit(1);
+                });
+                config_file = Some(val);
+            }
+            s if s.starts_with("--config-file=") => {
+                config_file = Some(s["--config-file=".len()..].to_string());
+            }
+            s if s.starts_with("-f=") => {
+                config_file = Some(s["-f=".len()..].to_string());
+            }
+            "-s" | "--standalone" => {
+                standalone = true;
+                standalone_set = true;
+            }
+            "-m" | "--multi-thread" => {
+                multi_thread = true;
+                multi_thread_set = true;
+            }
+            "--dns-server" => {
+                dns_server = true;
+                dns_server_set = true;
+            }
             "--dns-port" => {
                 let val = it.next().unwrap_or_else(|| {
                     eprintln!("error: --dns-port requires a value");
                     std::process::exit(1);
                 });
-                dns_port = val.parse().unwrap_or_else(|_| {
+                dns_port = Some(val.parse().unwrap_or_else(|_| {
                     eprintln!("error: --dns-port must be a valid port number");
                     std::process::exit(1);
-                });
+                }));
             }
             s if s.starts_with("--dns-port=") => {
-                dns_port = s["--dns-port=".len()..].parse().unwrap_or_else(|_| {
+                dns_port = Some(s["--dns-port=".len()..].parse().unwrap_or_else(|_| {
                     eprintln!("error: --dns-port must be a valid port number");
                     std::process::exit(1);
-                });
+                }));
             }
             "--dns-upstream" => {
                 let val = it.next().unwrap_or_else(|| {
                     eprintln!("error: --dns-upstream requires a value");
                     std::process::exit(1);
                 });
-                dns_upstream = val;
+                dns_upstream = Some(val);
             }
             s if s.starts_with("--dns-upstream=") => {
-                dns_upstream = s["--dns-upstream=".len()..].to_string();
+                dns_upstream = Some(s["--dns-upstream=".len()..].to_string());
             }
             "-h" | "--help" => {
                 print_help();
@@ -101,18 +134,53 @@ pub fn parse_args() -> Args {
         }
     }
 
-    let config = config.unwrap_or_else(|| {
-        eprintln!("error: the following required argument was not provided: --config <PATH>");
+    // --- Load config file (explicit or default) ---
+    let file_path = config_file.as_deref().unwrap_or(DEFAULT_CONFIG_FILE);
+
+    if let Ok(cf) = config::load_config_file(file_path) {
+        // Merge: CLI values take precedence; fall back to config file.
+        if rules.is_none() {
+            rules = cf.rules;
+        }
+        if !standalone_set {
+            standalone = cf.standalone;
+        }
+        if !multi_thread_set {
+            multi_thread = cf.multi_thread;
+        }
+        if !dns_server_set {
+            dns_server = cf.dns_server;
+        }
+        if dns_port.is_none() {
+            dns_port = Some(cf.dns_port);
+        }
+        if dns_upstream.is_none() {
+            dns_upstream = Some(cf.dns_upstream);
+        }
+    } else if config_file.is_some() {
+        // Explicit --config-file that failed to load → fatal.
+        eprintln!("error: failed to load config file '{}'", file_path);
+        std::process::exit(1);
+    }
+    // If no --config-file given and default doesn't exist, silently skip.
+
+    // --- Final validation ---
+    let rules = rules.unwrap_or_else(|| {
+        eprintln!(
+            "error: the following required argument was not provided: --rules <PATH>\n\
+             Hint: you may also set `rules` in {}",
+            DEFAULT_CONFIG_FILE
+        );
         print_help();
         std::process::exit(1);
     });
 
     Args {
-        config,
+        rules,
         standalone,
         multi_thread,
         dns_server,
-        dns_port,
-        dns_upstream,
+        dns_port: dns_port.unwrap_or(DNS_SERVER_PORT),
+        dns_upstream: dns_upstream.unwrap_or_else(|| DNS_UPSTREAM.to_string()),
     }
 }
