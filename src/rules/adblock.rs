@@ -106,12 +106,7 @@ impl RuleSet {
     /// (as produced by `format_pseudo_url`).  `source_domain` and
     /// `resource_type` are accepted for API compatibility but are currently
     /// unused (DNS-level filtering does not depend on the source context).
-    pub fn matches(
-        &self,
-        url: &str,
-        _source_domain: &str,
-        _resource_type: &str,
-    ) -> FilterAction {
+    pub fn matches(&self, url: &str, _source_domain: &str, _resource_type: &str) -> FilterAction {
         let hostname = extract_hostname(url);
         if hostname.is_empty() {
             return FilterAction::Allow;
@@ -279,10 +274,7 @@ mod tests {
         assert_eq!(extract_domain_from_rule("$generichide"), None);
         assert_eq!(extract_domain_from_rule(".ad-banner#$#"), None);
         // rule with path
-        assert_eq!(
-            extract_domain_from_rule("||example.com/path/to/ad"),
-            None
-        );
+        assert_eq!(extract_domain_from_rule("||example.com/path/to/ad"), None);
         // pure wildcard
         assert_eq!(extract_domain_from_rule("||*^"), None);
     }
@@ -305,25 +297,15 @@ mod tests {
     #[test]
     fn empty_ruleset_allows_all() {
         let rs = RuleSet::new();
-        assert_eq!(
-            rs.matches("https://evil.com/", "", ""),
-            FilterAction::Allow
-        );
+        assert_eq!(rs.matches("https://evil.com/", "", ""), FilterAction::Allow);
     }
 
     #[test]
     fn block_and_allow() {
-        let rs = RuleSet::from_rules([
-            "||evil.com^",
-            "||doubleclick.net^",
-            "@@||good.evil.com^",
-        ]);
+        let rs = RuleSet::from_rules(["||evil.com^", "||doubleclick.net^", "@@||good.evil.com^"]);
 
         // Blocked domains
-        assert_eq!(
-            rs.matches("https://evil.com/", "", ""),
-            FilterAction::Block
-        );
+        assert_eq!(rs.matches("https://evil.com/", "", ""), FilterAction::Block);
         assert_eq!(
             rs.matches("https://ads.evil.com/", "", ""),
             FilterAction::Block
@@ -348,15 +330,9 @@ mod tests {
 
     #[test]
     fn allowlist_takes_priority() {
-        let rs = RuleSet::from_rules([
-            "||evil.com^",
-            "@@||evil.com^",
-        ]);
+        let rs = RuleSet::from_rules(["||evil.com^", "@@||evil.com^"]);
 
-        assert_eq!(
-            rs.matches("https://evil.com/", "", ""),
-            FilterAction::Allow
-        );
+        assert_eq!(rs.matches("https://evil.com/", "", ""), FilterAction::Allow);
         assert_eq!(
             rs.matches("https://ads.evil.com/", "", ""),
             FilterAction::Allow
@@ -373,10 +349,7 @@ mod tests {
         ]);
 
         assert_eq!(rs.block_count(), 1);
-        assert_eq!(
-            rs.matches("https://evil.com/", "", ""),
-            FilterAction::Block
-        );
+        assert_eq!(rs.matches("https://evil.com/", "", ""), FilterAction::Block);
     }
 
     #[test]
@@ -396,10 +369,7 @@ mod tests {
 
     #[test]
     fn wildcard_domain_rules() {
-        let rs = RuleSet::from_rules([
-            "||*.diwodiwo.xyz^",
-            "||*two-gun-volley.pages.dev^",
-        ]);
+        let rs = RuleSet::from_rules(["||*.diwodiwo.xyz^", "||*two-gun-volley.pages.dev^"]);
 
         assert_eq!(rs.block_count(), 2);
 

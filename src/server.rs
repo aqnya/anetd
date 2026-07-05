@@ -14,14 +14,33 @@ use crate::rules::{RuleSet, load_rules, spawn_reload_watcher};
 use crate::session::handle_client;
 use crate::signal::{ORIGINAL_SOCKET_RENAMED, setup_signals};
 
+use std::ffi::CString;
+
+fn set_selinux_context(path: &str, value: &[u8]) -> io::Result<()> {
+    let path = CString::new(path).unwrap();
+    let name = CString::new("security.selinux").unwrap();
+
+    let ret = unsafe {
+        libc::setxattr(
+            path.as_ptr(),
+            name.as_ptr(),
+            value.as_ptr().cast(),
+            value.len(),
+            0,
+        )
+    };
+
+    if ret == -1 {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
+}
+
 fn setup_socket_permissions() -> io::Result<()> {
     #[cfg(unix)]
     {
-        xattr::set(
-            PROXY_SOCKET,
-            "security.selinux",
-            b"u:object_r:dnsproxyd_socket:s0",
-        )?;
+        set_selinux_context(PROXY_SOCKET, b"u:object_r:dnsproxyd_socket:s0")?;
         std::fs::set_permissions(PROXY_SOCKET, std::fs::Permissions::from_mode(0o660))?;
         unsafe {
             let c_path = std::ffi::CString::new(PROXY_SOCKET).unwrap();
