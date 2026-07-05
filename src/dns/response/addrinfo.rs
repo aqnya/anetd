@@ -105,13 +105,11 @@ pub async fn send_fake_ipv6<W: AsyncWrite + Unpin>(w: &mut W, ip: Ipv6Addr) -> i
 /// matching what netd returns for NXDOMAIN queries.
 pub async fn send_nxdomain<W: AsyncWrite + Unpin>(w: &mut W) -> io::Result<()> {
     DnsProxyStatus::DnsProxyOperationFailed.write(w).await?;
-    write_be32(w, libc::EAI_NONAME).await?;
-    write_be32(w, libc::ENOENT).await
+    write_be32(w, libc::EAI_NONAME).await
 }
 
 /// Sends a generic operation failure response (EAI_SYSTEM / ECONNREFUSED).
 pub async fn send_operation_failed<W: AsyncWrite + Unpin>(w: &mut W) -> io::Result<()> {
     DnsProxyStatus::DnsProxyOperationFailed.write(w).await?;
-    write_be32(w, libc::EAI_SYSTEM).await?;
-    write_be32(w, libc::ECONNREFUSED).await
+    write_be32(w, libc::EAI_SYSTEM).await
 }

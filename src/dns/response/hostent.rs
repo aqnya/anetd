@@ -74,6 +74,5 @@ pub async fn send_fake_ipv6<W: AsyncWrite + Unpin>(
 
 /// Sends a generic operation failure response, matching the gethostbyname failure path.
 pub async fn send_operation_failed<W: AsyncWrite + Unpin>(w: &mut W) -> io::Result<()> {
-    DnsProxyStatus::DnsProxyOperationFailed.write(w).await?;
-    write_be32(w, 0).await
+    DnsProxyStatus::DnsProxyOperationFailed.write(w).await
 }
