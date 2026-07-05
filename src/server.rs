@@ -5,7 +5,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::UnixListener as StdUnixListener;
 use std::sync::Arc;
 use tokio::net::UnixListener;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 use crate::cli::Args;
 use crate::config::{PROXY_SOCKET, REAL_SOCKET};
@@ -74,9 +74,12 @@ pub async fn init(args: &Args) -> io::Result<()> {
         dns_server::run(bind_addr, upstream, store).await?;
     } else {
         // Socket-hijacking mode: intercept netd dnsproxyd socket
+
         if std::path::Path::new(REAL_SOCKET).exists() {
-            warn!("{} already exists, removing", REAL_SOCKET);
-            std::fs::remove_file(REAL_SOCKET)?;
+            return Err(io::Error::new(
+                ErrorKind::AlreadyExists,
+                format!("{REAL_SOCKET} already exists, please reboot first"),
+            ));
         }
 
         std::fs::rename(PROXY_SOCKET, REAL_SOCKET)?;
