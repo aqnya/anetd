@@ -1,9 +1,6 @@
 use crate::rules::adblock::RuleSet;
-use adblock::engine::Engine;
-use adblock::lists::ParseOptions;
 use sha2::{Digest, Sha256};
 use std::path::Path;
-use std::sync::Arc;
 use tracing::{error, info, warn};
 
 fn calculate_file_hash(path: &Path) -> Option<String> {
@@ -60,23 +57,17 @@ pub fn load_rules(path_str: &str) -> RuleSet {
         return RuleSet::new();
     }
 
-    let mut all_lines = Vec::new();
+    let mut all_lines: Vec<String> = Vec::new();
 
     for (file_path, _) in &watched_files {
         match std::fs::read_to_string(file_path) {
             Ok(text) => {
-                let lines_count_before = all_lines.len();
+                let count_before = all_lines.len();
                 for line in text.lines() {
-                    let s = line.trim();
-                    if !s.is_empty() && !s.starts_with('!') && !s.starts_with('[') {
-                        all_lines.push(s.to_string());
-                    }
+                    all_lines.push(line.to_string());
                 }
-                info!(
-                    "[rules] loaded {} rules from {}",
-                    all_lines.len() - lines_count_before,
-                    file_path
-                );
+                let added = all_lines.len() - count_before;
+                info!("[rules] loaded {added} lines from {file_path}");
             }
             Err(e) => {
                 error!("[rules] failed to read file {file_path}: {e}");
@@ -85,13 +76,18 @@ pub fn load_rules(path_str: &str) -> RuleSet {
     }
 
     info!(
-        "[rules] compiling total {} rules into Adblock engine...",
+        "[rules] compiling total {} lines into rule engine...",
         all_lines.len()
     );
-    let engine = Engine::from_rules(all_lines, ParseOptions::default());
 
-    RuleSet {
-        engine: Arc::new(engine),
-        watched_files,
-    }
+    let mut rule_set = RuleSet::from_rules(&all_lines);
+    rule_set.watched_files = watched_files;
+
+    info!(
+        "[rules] compiled: {} block rules, {} allow rules",
+        rule_set.block_count(),
+        rule_set.allow_count()
+    );
+
+    rule_set
 }
