@@ -33,7 +33,7 @@
 ### Build
 
 ```sh
-git clone https://github.com/example/anetd.git
+git clone https://github.com/aqnya/anetd.git
 cd anetd
 cargo build --release
 ```
