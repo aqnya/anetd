@@ -19,7 +19,7 @@ jobs:
 
       - name: Cache NDK
         id: cache-ndk
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: android-ndk-r27c
           key: ndk-r27c-v1
