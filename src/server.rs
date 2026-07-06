@@ -5,6 +5,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::UnixListener as StdUnixListener;
 use std::sync::Arc;
 use tokio::net::UnixListener;
+use tokio::time::{Duration, sleep};
 use tracing::{error, info};
 
 use crate::cli::Args;
@@ -81,6 +82,12 @@ pub async fn init(args: &Args) -> io::Result<()> {
                 format!("{REAL_SOCKET} already exists, please reboot first"),
             ));
         }
+
+        info!("waiting for {PROXY_SOCKET} to appear...");
+        while !std::path::Path::new(PROXY_SOCKET).exists() {
+            sleep(Duration::from_millis(500)).await;
+        }
+        info!("{PROXY_SOCKET} found");
 
         std::fs::rename(PROXY_SOCKET, REAL_SOCKET)?;
         ORIGINAL_SOCKET_RENAMED.store(true, std::sync::atomic::Ordering::SeqCst);
