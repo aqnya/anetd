@@ -12,8 +12,11 @@
 - **Standalone DNS Server** — Built-in UDP/TCP DNS server with configurable listen port and upstream address.
 - **Adblock Rule Engine** — A bespoke, lightweight matcher supporting `||domain.com^` for blocking and `@@||domain.com^` for allowlist exceptions. Cosmetic and element-hiding rules are silently ignored.
 - **DNS Wire Protocol** — Parses `getaddrinfo`, `gethostbyname`, and `resnsend` (the three dnsproxyd command types), extracts the hostname, and returns a crafted NXDOMAIN response when a rule matches.
+- **DNS Cache** — In-memory, TTL-aware response cache for the built-in DNS server that reduces redundant upstream queries and saves battery.
+- **Network Change Detection** — Monitors default-route changes via netlink (WiFi ↔ mobile data handover). Flushes the DNS cache and recreates upstream sockets automatically.
 - **Hot Reload** — Watches rule files via inotify and atomically swaps in new rulesets without restarting.
 - **Daemon Mode** — Supports daemonization, PID files, and rolling log retention.
+- **Battery Saver** — Optional mode that shrinks the DNS cache, limits netd connections, and reduces worker threads for lower power consumption.
 - **Flexible Configuration** — CLI arguments > TOML config file > hardcoded defaults, merged by precedence.
 
 ---
@@ -51,6 +54,7 @@ multi_thread = true
 dns_server = false
 dns_port = 53
 dns_upstream = "8.8.8.8:53"
+battery_saver = false
 ```
 
 ### Run
@@ -81,6 +85,7 @@ Options:
       --dns-server           Enable built-in DNS server (UDP/TCP)
       --dns-port <PORT>      DNS server listen port (default: 53)
       --dns-upstream <ADDR>  Upstream DNS server address (default: 8.8.8.8:53)
+      --battery-saver        Enable battery saver mode (smaller cache, fewer connections)
   -h, --help                 Print help
 ```
 
@@ -143,6 +148,7 @@ src/
 ├── config.rs       Constants & TOML config loading
 ├── daemon.rs       Daemonization
 ├── logging.rs      Logging setup (console / rolling file)
+├── network.rs      Netlink route monitoring for network change detection
 ├── server.rs       Main server loop (socket hijack / DNS server dispatch)
 ├── session.rs      Client session handling & transparent proxy
 ├── protocol.rs     dnsproxyd wire protocol helpers
@@ -150,10 +156,12 @@ src/
 ├── dns_server.rs   Standalone DNS server (UDP/TCP)
 ├── dns/
 │   ├── mod.rs
+│   ├── cache.rs     DNS response cache (TTL-aware)
 │   ├── nxdomain.rs  NXDOMAIN response builder
 │   ├── status.rs    dnsproxyd status codes
 │   ├── wire.rs      DNS wire-format I/O
 │   └── response/
+│       ├── mod.rs
 │       ├── addrinfo.rs  getaddrinfo response builder
 │       ├── hostent.rs   gethostbyname response builder
 │       └── raw.rs       resnsend raw response builder

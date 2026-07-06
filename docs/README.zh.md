@@ -13,7 +13,10 @@
 - **Adblock 规则引擎** — 自研轻量级匹配器，支持 `||domain.com^` 阻断与 `@@||domain.com^` 白名单语法。忽略无 DNS 语义的页面元素隐藏规则。
 - **DNS 协议原语** — 解析 `getaddrinfo`、`gethostbyname`、`resnsend` 三种 dnsproxyd 命令，精确提取主机名，命中黑名单时返回构造的 NXDOMAIN 响应。
 - **规则热更新** — 基于 inotify 监视规则文件变动，自动重载，无需重启进程。
+- **DNS 缓存** — 内建 DNS 服务器的 TTL 感知内存缓存，减少冗余上游查询，降低功耗。
+- **网络变化检测** — 基于 netlink 监控默认路由变化（WiFi ↔ 移动数据切换），自动清空 DNS 缓存并重建上游套接字。
 - **后台守护进程** — 支持 daemonize、PID 文件、日志滚动归档。
+- **省电模式** — 可选模式，缩小 DNS 缓存、限制 netd 连接数、减少工作线程以降低功耗。
 - **灵活的配置层级** — CLI 参数 > TOML 配置文件 > 硬编码默认值，按优先级合并。
 
 ---
@@ -51,6 +54,7 @@ multi_thread = true
 dns_server = false
 dns_port = 53
 dns_upstream = "8.8.8.8:53"
+battery_saver = false
 ```
 
 ### 运行
@@ -81,6 +85,7 @@ Options:
       --dns-server           启用内建 DNS 服务器（UDP/TCP）
       --dns-port <PORT>      DNS 服务器监听端口（默认：53）
       --dns-upstream <ADDR>  上游 DNS 服务器地址（默认：8.8.8.8:53）
+      --battery-saver        启用省电模式（缩小缓存、减少连接）
   -h, --help                 打印帮助信息
 ```
 
@@ -143,6 +148,7 @@ src/
 ├── config.rs       常量定义、TOML 配置文件加载
 ├── daemon.rs       守护进程化
 ├── logging.rs      日志初始化（控制台 / 滚动文件）
+├── network.rs     netlink 路由监控，网络变化检测
 ├── server.rs       服务器主循环（socket 劫持 / DNS 服务器分发）
 ├── session.rs      客户端会话处理与透明代理
 ├── protocol.rs     dnsproxyd 线路协议辅助工具
@@ -150,10 +156,12 @@ src/
 ├── dns_server.rs   独立 DNS 服务器（UDP/TCP）
 ├── dns/
 │   ├── mod.rs
+│   ├── cache.rs     DNS 响应缓存（TTL 感知）
 │   ├── nxdomain.rs 构造 NXDOMAIN 响应
 │   ├── status.rs   dnsproxyd 状态码枚举
 │   ├── wire.rs     DNS 线路协议读写
 │   └── response/
+│       ├── mod.rs
 │       ├── addrinfo.rs  getaddrinfo 响应构造
 │       ├── hostent.rs   gethostbyname 响应构造
 │       └── raw.rs       resnsend 原始响应构造
