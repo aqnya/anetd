@@ -1,0 +1,6 @@
+id=anetd
+name=Anetd
+version=v0.1.0
+versionCode=1
+author=aqnya
+description=Android network rules daemon

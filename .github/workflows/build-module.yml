@@ -1,0 +1,56 @@
+name: Package Magisk Module
+
+on:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Cache NDK
+        id: cache-ndk
+        uses: actions/cache@v4
+        with:
+          path: android-ndk-r27c
+          key: ndk-r27c-v1
+
+      - name: Download NDK
+        if: steps.cache-ndk.outputs.cache-hit != 'true'
+        run: |
+          wget -q https://dl.google.com/android/repository/android-ndk-r27c-linux.zip
+          unzip -q android-ndk-r27c-linux.zip
+          rm android-ndk-r27c-linux.zip
+
+      - name: Configure NDK toolchain
+        run: |
+          echo "ANDROID_NDK_HOME=$PWD/android-ndk-r27c" >> $GITHUB_ENV
+          echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$PWD/android-ndk-r27c/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang" >> $GITHUB_ENV
+
+      - name: Build
+        run: cargo build --release --target aarch64-linux-android
+
+      - name: Package module
+        run: |
+          VERSION=$(grep '^version=' module/module.prop | cut -d= -f2)
+          mkdir -p dist
+          cp target/aarch64-linux-android/release/anetd dist/
+          cp module/module.prop dist/
+          cp module/post-fs-data.sh dist/
+          cp -r module/rules dist/
+          cd dist && zip -r ../anetd-${VERSION}.zip .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: anetd-magisk-module
+          path: anetd-*.zip
