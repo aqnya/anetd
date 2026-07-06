@@ -2,11 +2,11 @@ use std::io;
 use tracing::{info, trace};
 
 use crate::handlers::{CommandCtx, CommandHandler, format_pseudo_url};
+use crate::protocol::ProtoWrite;
 use crate::rules::FilterAction;
+use crate::session::proxy_transparent;
 
 use crate::dns::response::addrinfo;
-use crate::protocol::ProtoWrite;
-use crate::session::{connect_netd, proxy_transparent};
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
@@ -60,15 +60,18 @@ impl CommandHandler for GetAddrInfoHandler {
                 client,
                 cmd_line,
                 rules,
+                pool,
             } = ctx;
 
             let Some(req) = GetAddrInfoRequest::parse(cmd_line) else {
                 trace!(
                     " [I] Failed to parse getaddrinfo command, falling back to transparent proxy"
                 );
-                let mut netd = connect_netd().await?;
+                let mut netd = pool.acquire().await?;
                 netd.write_cmd(cmd_line).await?;
-                return proxy_transparent(client, &mut netd).await;
+                let res = proxy_transparent(client, &mut netd).await;
+                pool.release(netd).await;
+                return res;
             };
 
             let hostname = req.hostname_str();
@@ -82,9 +85,11 @@ impl CommandHandler for GetAddrInfoHandler {
                     info!("[BLOCKED] cmd: \"{}\"", cmd_line.trim());
                 }
                 FilterAction::Allow => {
-                    let mut netd = connect_netd().await?;
+                    let mut netd = pool.acquire().await?;
                     netd.write_cmd(cmd_line).await?;
-                    proxy_transparent(client, &mut netd).await?;
+                    let res = proxy_transparent(client, &mut netd).await;
+                    pool.release(netd).await;
+                    return res;
                 }
             }
 

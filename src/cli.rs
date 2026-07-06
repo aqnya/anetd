@@ -19,6 +19,10 @@ pub struct Args {
 
     /// Upstream DNS server address (default: 8.8.8.8:53)
     pub dns_upstream: String,
+
+    /// Enable battery saver mode: smaller cache, single netd connection,
+    /// reduced worker threads.
+    pub battery_saver: bool,
 }
 
 fn print_help() {
@@ -33,6 +37,7 @@ Options:
       --dns-server           Enable built-in DNS server (UDP/TCP)
       --dns-port <PORT>      DNS server listen port (default: 53)
       --dns-upstream <ADDR>  Upstream DNS server address (default: 8.8.8.8:53)
+      --battery-saver        Enable battery saver mode (smaller cache, fewer connections)
   -h, --help                 Print help"
     );
 }
@@ -54,6 +59,8 @@ pub fn parse_args() -> Args {
     let mut dns_server_set = false;
     let mut dns_port: Option<u16> = None;
     let mut dns_upstream: Option<String> = None;
+    let mut battery_saver = false;
+    let mut battery_saver_set = false;
 
     let mut it = std::env::args().skip(1);
     while let Some(arg) = it.next() {
@@ -122,6 +129,10 @@ pub fn parse_args() -> Args {
             s if s.starts_with("--dns-upstream=") => {
                 dns_upstream = Some(s["--dns-upstream=".len()..].to_string());
             }
+            "--battery-saver" => {
+                battery_saver = true;
+                battery_saver_set = true;
+            }
             "-h" | "--help" => {
                 print_help();
                 std::process::exit(0);
@@ -157,6 +168,9 @@ pub fn parse_args() -> Args {
         if dns_upstream.is_none() {
             dns_upstream = Some(cf.dns_upstream);
         }
+        if !battery_saver_set {
+            battery_saver = cf.battery_saver;
+        }
     } else if config_file.is_some() {
         // Explicit --config-file that failed to load → fatal.
         eprintln!("error: failed to load config file '{}'", file_path);
@@ -182,5 +196,6 @@ pub fn parse_args() -> Args {
         dns_server,
         dns_port: dns_port.unwrap_or(DNS_SERVER_PORT),
         dns_upstream: dns_upstream.unwrap_or_else(|| DNS_UPSTREAM.to_string()),
+        battery_saver,
     }
 }

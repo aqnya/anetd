@@ -5,7 +5,7 @@ use crate::dns::response::addrinfo;
 use crate::handlers::{CommandCtx, CommandHandler, format_pseudo_url};
 use crate::protocol::ProtoWrite;
 use crate::rules::FilterAction;
-use crate::session::{connect_netd, proxy_transparent};
+use crate::session::proxy_transparent;
 
 pub struct GetHostByNameHandler;
 
@@ -19,13 +19,16 @@ impl CommandHandler for GetHostByNameHandler {
                 client,
                 cmd_line,
                 rules,
+                pool,
             } = ctx;
 
             let tokens: Vec<&str> = cmd_line.split_whitespace().collect();
             if tokens.len() < 3 {
-                let mut netd = connect_netd().await?;
+                let mut netd = pool.acquire().await?;
                 netd.write_cmd(cmd_line).await?;
-                return proxy_transparent(client, &mut netd).await;
+                let res = proxy_transparent(client, &mut netd).await;
+                pool.release(netd).await;
+                return res;
             }
 
             let _net_id = tokens[1];
@@ -44,9 +47,11 @@ impl CommandHandler for GetHostByNameHandler {
                     info!("[BLOCKED] cmd: \"{}\"", cmd_line.trim());
                 }
                 FilterAction::Allow => {
-                    let mut netd = connect_netd().await?;
+                    let mut netd = pool.acquire().await?;
                     netd.write_cmd(cmd_line).await?;
-                    proxy_transparent(client, &mut netd).await?;
+                    let res = proxy_transparent(client, &mut netd).await;
+                    pool.release(netd).await;
+                    return res;
                 }
             }
 

@@ -6,6 +6,7 @@ use std::sync::{Arc, OnceLock};
 use tokio::net::UnixStream;
 
 use crate::rules::RuleSet;
+use crate::session::NetdPool;
 
 pub mod getaddrinfo;
 pub mod gethostbyname;
@@ -15,6 +16,7 @@ pub struct CommandCtx<'a> {
     pub client: &'a mut UnixStream,
     pub cmd_line: &'a str,
     pub rules: Arc<RuleSet>,
+    pub pool: &'a NetdPool,
 }
 
 pub trait CommandHandler: Send + Sync {

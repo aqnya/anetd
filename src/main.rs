@@ -5,6 +5,7 @@ mod dns;
 mod dns_server;
 mod handlers;
 mod logging;
+mod network;
 mod rules;
 mod server;
 
@@ -27,9 +28,20 @@ fn main() -> std::io::Result<()> {
         start_daemon();
     }
     let runtime = if args.multi_thread {
-        tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()?
+        let mut builder = tokio::runtime::Builder::new_multi_thread();
+        builder.enable_all();
+
+        // On Android, limiting worker threads reduces CPU wake-ups and
+        // power consumption.  In battery-saver mode we use a single
+        // worker; otherwise cap at 2 (DNS proxy workload is I/O-bound,
+        // not CPU-bound).
+        if args.battery_saver {
+            builder.worker_threads(1);
+        } else {
+            builder.worker_threads(2);
+        }
+
+        builder.build()?
     } else {
         tokio::runtime::Builder::new_current_thread()
             .enable_all()

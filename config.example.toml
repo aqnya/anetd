@@ -4,3 +4,6 @@
    dns_server = true
    dns_port = 53
    dns_upstream = "8.8.8.8:53"
+   # Enable battery saver: smaller DNS cache, single netd connection,
+   # reduced worker threads.
+   battery_saver = false

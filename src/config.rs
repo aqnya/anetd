@@ -52,6 +52,11 @@ pub struct ConfigFile {
     /// Upstream DNS server address.
     #[serde(default = "default_dns_upstream")]
     pub dns_upstream: String,
+
+    /// Enable battery saver mode: smaller DNS cache, single netd connection,
+    /// reduced worker threads.
+    #[serde(default)]
+    pub battery_saver: bool,
 }
 
 fn default_dns_port() -> u16 {
