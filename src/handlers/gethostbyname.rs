@@ -1,4 +1,5 @@
 use std::io;
+use tokio::net::UnixStream;
 use tracing::{info, trace};
 
 use crate::dns::response::addrinfo;
@@ -19,16 +20,14 @@ impl CommandHandler for GetHostByNameHandler {
                 client,
                 cmd_line,
                 rules,
-                pool,
+                real_socket,
             } = ctx;
 
             let tokens: Vec<&str> = cmd_line.split_whitespace().collect();
             if tokens.len() < 3 {
-                let mut netd = pool.acquire().await?;
+                let mut netd = UnixStream::connect(real_socket).await?;
                 netd.write_cmd(cmd_line).await?;
-                let res = proxy_transparent(client, &mut netd).await;
-                pool.release(netd).await;
-                return res;
+                return proxy_transparent(client, &mut netd).await;
             }
 
             let _net_id = tokens[1];
@@ -47,11 +46,9 @@ impl CommandHandler for GetHostByNameHandler {
                     info!("[BLOCKED] cmd: \"{}\"", cmd_line.trim());
                 }
                 FilterAction::Allow => {
-                    let mut netd = pool.acquire().await?;
+                    let mut netd = UnixStream::connect(real_socket).await?;
                     netd.write_cmd(cmd_line).await?;
-                    let res = proxy_transparent(client, &mut netd).await;
-                    pool.release(netd).await;
-                    return res;
+                    return proxy_transparent(client, &mut netd).await;
                 }
             }
 

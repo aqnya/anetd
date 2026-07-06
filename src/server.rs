@@ -14,7 +14,7 @@ use crate::dns::cache::DnsCache;
 use crate::dns_server;
 use crate::network::NetworkMonitor;
 use crate::rules::{RuleSet, load_rules, spawn_reload_watcher};
-use crate::session::{NetdPool, handle_client};
+use crate::session::handle_client;
 use crate::signal::{ORIGINAL_SOCKET_RENAMED, setup_signals};
 
 use std::ffi::CString;
@@ -125,13 +125,13 @@ pub async fn init(args: &Args) -> io::Result<()> {
     let cache =
         DNS_CACHE.get_or_init(|| DnsCache::new(if args.battery_saver { 512 } else { 2048 }));
 
-    // Network monitor: detects WiFi ↔ mobile-data handover via netlink.
-    let net_monitor = NetworkMonitor::spawn().unwrap_or_else(|e| {
-        info!("network monitor unavailable ({e}), proceeding without it");
-        NetworkMonitor::inert()
-    });
-
     if args.dns_server {
+        // Network monitor: detects WiFi ↔ mobile-data handover via netlink.
+        let net_monitor = NetworkMonitor::spawn().unwrap_or_else(|e| {
+            info!("network monitor unavailable ({e}), proceeding without it");
+            NetworkMonitor::inert()
+        });
+
         let bind_addr: SocketAddr = format!("0.0.0.0:{}", args.dns_port)
             .parse()
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
@@ -147,6 +147,11 @@ pub async fn init(args: &Args) -> io::Result<()> {
         dns_server::run(bind_addr, upstream, store, cache, net_monitor).await?;
     } else {
         // Socket-hijacking mode: intercept netd dnsproxyd socket.
+        //
+        // Each handler creates a fresh Unix socket to the real netd per
+        // request (following DnsResolver's per-query socket pattern).
+        // This avoids stale-connection races on network switch — no
+        // connection pool to invalidate.
 
         if std::path::Path::new(REAL_SOCKET).exists() {
             return Err(io::Error::new(
@@ -169,31 +174,12 @@ pub async fn init(args: &Args) -> io::Result<()> {
         info!("listening on {PROXY_SOCKET}");
         info!("[*] forwarding to {REAL_SOCKET}");
 
-        // Connection pool for netd socket reuse.
-        let pool_size = if args.battery_saver { 1 } else { 4 };
-        let netd_pool = Arc::new(NetdPool::new(REAL_SOCKET, pool_size));
-
-        // Spawn a task that invalidates pooled connections on network change.
-        // netd may restart during WiFi ↔ mobile-data handover, so stale sockets
-        // must be discarded.
-        {
-            let pool = netd_pool.clone();
-            tokio::spawn(async move {
-                loop {
-                    net_monitor.notified().await;
-                    info!("network change — invalidating netd connection pool");
-                    pool.invalidate_all().await;
-                }
-            });
-        }
-
         loop {
             match listener.accept().await {
                 Ok((client, _addr)) => {
                     let rules = store.load_full();
-                    let pool = netd_pool.clone();
                     tokio::spawn(async move {
-                        if let Err(e) = handle_client(client, rules, &pool).await {
+                        if let Err(e) = handle_client(client, rules, REAL_SOCKET).await {
                             if e.kind() != ErrorKind::UnexpectedEof
                                 && e.kind() != ErrorKind::BrokenPipe
                                 && e.kind() != ErrorKind::ConnectionReset

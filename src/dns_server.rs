@@ -5,8 +5,7 @@ use std::sync::Arc;
 use arc_swap::ArcSwap;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream, UdpSocket};
-use tokio::sync::Mutex;
-use tracing::{error, info, trace, warn};
+use tracing::{error, info, warn};
 
 use crate::dns::cache::{DnsCache, parse_query_type};
 use crate::dns::nxdomain::make_nxdomain_response;
@@ -21,18 +20,14 @@ const MAX_UDP_DNS_SIZE: usize = 512;
 /// Upstream forward timeout (seconds).
 const UPSTREAM_TIMEOUT_SECS: u64 = 10;
 
-/// Shared context for DNS request handling.
-struct ServerCtx {
-    upstream: Arc<Mutex<UdpSocket>>,
-    cache: &'static DnsCache,
-}
-
 /// Run the DNS server, listening on `bind_addr` and forwarding allowed queries
 /// to the upstream DNS server at `upstream`.  Responses are cached in
 /// `dns_cache` to reduce network traffic and battery consumption.
 ///
-/// On network change (WiFi ↔ mobile data) the DNS cache is flushed and the
-/// upstream socket is recreated so it binds to the new default interface.
+/// Each upstream query creates its own UDP socket (following the DnsResolver
+/// pattern in `res_send.cpp::send_dg`), so network changes (WiFi ↔ mobile
+/// data) never leave in-flight queries stuck on a stale route.  On network
+/// change we only flush the DNS cache — stale CDN IPs must be invalidated.
 pub async fn run(
     bind_addr: SocketAddr,
     upstream: SocketAddr,
@@ -46,32 +41,20 @@ pub async fn run(
     let tcp_listener = TcpListener::bind(bind_addr).await?;
     info!("DNS server (TCP) listening on {}", bind_addr);
 
-    // Reusable upstream socket: one connected UDP socket serialised via
-    // a mutex eliminates per-query bind(0)/connect overhead.
-    let upstream_socket = {
-        let sock = UdpSocket::bind("0.0.0.0:0").await?;
-        sock.connect(upstream).await?;
-        Arc::new(Mutex::new(sock))
-    };
-
-    let ctx = Arc::new(ServerCtx {
-        upstream: Arc::clone(&upstream_socket),
-        cache: dns_cache,
-    });
-
     let udp_handle = {
         let udp = udp_socket.clone();
-        let ctx = ctx.clone();
+        let upstream = upstream;
+        let dns_cache: &'static DnsCache = dns_cache;
         tokio::spawn(async move {
             let mut buf = vec![0u8; MAX_UDP_DNS_SIZE];
             loop {
                 match udp.recv_from(&mut buf).await {
                     Ok((n, src)) => {
                         let query = buf[..n].to_vec();
-                        let rules = rules.load_full();
+                        let r = rules.load_full();
                         let udp = udp.clone();
-                        let ctx = ctx.clone();
-                        tokio::spawn(serve_udp(udp, src, query, ctx, rules));
+                        let cache = dns_cache;
+                        tokio::spawn(serve_udp(udp, src, query, cache, upstream, r));
                     }
                     Err(e) => error!("DNS UDP recv error: {e}"),
                 }
@@ -80,14 +63,14 @@ pub async fn run(
     };
 
     let tcp_handle = {
-        let ctx = ctx.clone();
+        let dns_cache: &'static DnsCache = dns_cache;
         tokio::spawn(async move {
             loop {
                 match tcp_listener.accept().await {
                     Ok((stream, src)) => {
-                        let rules = rules.load_full();
-                        let ctx = ctx.clone();
-                        tokio::spawn(serve_tcp(stream, src, ctx, rules));
+                        let r = rules.load_full();
+                        let cache = dns_cache;
+                        tokio::spawn(serve_tcp(stream, src, cache, upstream, r));
                     }
                     Err(e) => error!("DNS TCP accept error: {e}"),
                 }
@@ -95,21 +78,16 @@ pub async fn run(
         })
     };
 
-    // ── network change handler ──────────────────────────────────────
-    // Flush DNS cache and recreate upstream socket on default-route change.
-    let upstream_addr = upstream; // copy for use in the task
-    let upstream_for_net = upstream_socket.clone();
-    let cache_for_net: &'static DnsCache = dns_cache;
+    // On network change, flush the DNS cache — stale CDN IPs from the
+    // previous network must be evicted.  Each upstream query creates its
+    // own socket, so there is no shared socket to recreate.
     let net_handle = {
+        let cache_for_net: &'static DnsCache = dns_cache;
         tokio::spawn(async move {
             loop {
                 net_monitor.notified().await;
                 info!("network change — flushing DNS cache");
                 cache_for_net.flush().await;
-                match recreate_upstream(&upstream_for_net, upstream_addr).await {
-                    Ok(()) => info!("upstream DNS socket recreated for new network"),
-                    Err(e) => error!("failed to recreate upstream socket: {e}"),
-                }
             }
         })
     };
@@ -123,25 +101,16 @@ pub async fn run(
     Ok(())
 }
 
-/// Recreate the upstream UDP socket so it binds to the current default
-/// interface.  Called on network change (WiFi ↔ mobile data handover).
-async fn recreate_upstream(upstream: &Arc<Mutex<UdpSocket>>, addr: SocketAddr) -> io::Result<()> {
-    let new_sock = UdpSocket::bind("0.0.0.0:0").await?;
-    new_sock.connect(addr).await?;
-    let mut sock = upstream.lock().await;
-    *sock = new_sock;
-    Ok(())
-}
-
 /// Handle a single UDP DNS query.
 async fn serve_udp(
     listener: Arc<UdpSocket>,
     src: SocketAddr,
     query: Vec<u8>,
-    ctx: Arc<ServerCtx>,
+    cache: &'static DnsCache,
+    upstream_addr: SocketAddr,
     rules: Arc<RuleSet>,
 ) {
-    if let Err(e) = serve_udp_inner(&listener, src, &query, &ctx, &rules).await {
+    if let Err(e) = serve_udp_inner(&listener, src, &query, cache, upstream_addr, &rules).await {
         error!("DNS UDP error from {src}: {e}");
     }
 }
@@ -150,7 +119,8 @@ async fn serve_udp_inner(
     listener: &UdpSocket,
     src: SocketAddr,
     query: &[u8],
-    ctx: &ServerCtx,
+    cache: &'static DnsCache,
+    upstream_addr: SocketAddr,
     rules: &RuleSet,
 ) -> io::Result<()> {
     let hostname = parse_dns_query_name(query);
@@ -165,17 +135,15 @@ async fn serve_udp_inner(
                     let nx = make_nxdomain_response(query).unwrap_or_else(|| query.to_vec());
                     listener.send_to(&nx, src).await?;
                     info!("[DNS BLOCKED] {name}");
-                    trace!("  dns query matched block rule");
                 }
                 FilterAction::Allow => {
-                    let response = forward_or_cache(query, ctx).await?;
+                    let response = forward_or_cache(query, cache, upstream_addr).await?;
                     listener.send_to(&response, src).await?;
-                    trace!("[DNS ALLOWED] {name}");
                 }
             }
         }
         None => {
-            let response = forward_upstream(query, ctx).await?;
+            let response = forward_upstream(query, upstream_addr).await?;
             listener.send_to(&response, src).await?;
         }
     }
@@ -187,10 +155,11 @@ async fn serve_udp_inner(
 async fn serve_tcp(
     mut stream: TcpStream,
     src: SocketAddr,
-    ctx: Arc<ServerCtx>,
+    cache: &'static DnsCache,
+    upstream_addr: SocketAddr,
     rules: Arc<RuleSet>,
 ) {
-    if let Err(e) = serve_tcp_inner(&mut stream, &src, &ctx, &rules).await {
+    if let Err(e) = serve_tcp_inner(&mut stream, &src, cache, upstream_addr, &rules).await {
         error!("DNS TCP error from {src}: {e}");
     }
 }
@@ -198,7 +167,8 @@ async fn serve_tcp(
 async fn serve_tcp_inner(
     stream: &mut TcpStream,
     src: &SocketAddr,
-    ctx: &ServerCtx,
+    cache: &'static DnsCache,
+    upstream_addr: SocketAddr,
     rules: &RuleSet,
 ) -> io::Result<()> {
     let mut len_buf = [0u8; 2];
@@ -223,19 +193,16 @@ async fn serve_tcp_inner(
                     info!("[DNS BLOCKED] {name}");
                     make_nxdomain_response(&query).unwrap_or(query)
                 }
-                FilterAction::Allow => {
-                    trace!("[DNS ALLOWED] {name}");
-                    match forward_or_cache(&query, ctx).await {
-                        Ok(resp) => resp,
-                        Err(e) => {
-                            error!("DNS TCP upstream error for {name}: {e}");
-                            return Err(e);
-                        }
+                FilterAction::Allow => match forward_or_cache(&query, cache, upstream_addr).await {
+                    Ok(resp) => resp,
+                    Err(e) => {
+                        error!("DNS TCP upstream error for {name}: {e}");
+                        return Err(e);
                     }
-                }
+                },
             }
         }
-        None => match forward_upstream(&query, ctx).await {
+        None => match forward_upstream(&query, upstream_addr).await {
             Ok(resp) => resp,
             Err(e) => return Err(e),
         },
@@ -249,29 +216,36 @@ async fn serve_tcp_inner(
 }
 
 /// Check cache, then forward if miss. Stores result on upstream success.
-async fn forward_or_cache(query: &[u8], ctx: &ServerCtx) -> io::Result<Vec<u8>> {
+async fn forward_or_cache(
+    query: &[u8],
+    cache: &'static DnsCache,
+    upstream_addr: SocketAddr,
+) -> io::Result<Vec<u8>> {
     let hostname = match parse_dns_query_name(query) {
         Some(n) => n,
-        None => return forward_upstream(query, ctx).await,
+        None => return forward_upstream(query, upstream_addr).await,
     };
 
     let qtype = parse_query_type(query).unwrap_or(1); // default to A
 
-    // Check cache first.
-    if let Some(cached) = ctx.cache.get(&hostname, qtype).await {
-        trace!("[DNS CACHE HIT] {hostname}");
+    if let Some(cached) = cache.get(&hostname, qtype).await {
         return Ok(cached);
     }
 
-    // Cache miss — forward upstream.
-    let response = forward_upstream(query, ctx).await?;
-    ctx.cache.put(&hostname, qtype, &response).await;
+    let response = forward_upstream(query, upstream_addr).await?;
+    cache.put(&hostname, qtype, &response).await;
     Ok(response)
 }
 
-/// Forward a DNS query via the reusable upstream UDP socket.
-async fn forward_upstream(query: &[u8], ctx: &ServerCtx) -> io::Result<Vec<u8>> {
-    let sock = ctx.upstream.lock().await;
+/// Forward a DNS query to the upstream server via a fresh, per-query UDP socket.
+///
+/// Following the DnsResolver pattern (`res_send.cpp::send_dg`), each query
+/// creates its own socket.  This means network changes (WiFi ↔ mobile data)
+/// don't leave in-flight queries stranded on a stale interface — new queries
+/// naturally bind to the current default route.
+async fn forward_upstream(query: &[u8], addr: SocketAddr) -> io::Result<Vec<u8>> {
+    let sock = UdpSocket::bind("0.0.0.0:0").await?;
+    sock.connect(addr).await?;
     sock.send(query).await?;
 
     let mut buf = vec![0u8; 4096];

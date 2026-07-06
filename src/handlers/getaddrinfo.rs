@@ -1,4 +1,5 @@
 use std::io;
+use tokio::net::UnixStream;
 use tracing::{info, trace};
 
 use crate::handlers::{CommandCtx, CommandHandler, format_pseudo_url};
@@ -60,18 +61,16 @@ impl CommandHandler for GetAddrInfoHandler {
                 client,
                 cmd_line,
                 rules,
-                pool,
+                real_socket,
             } = ctx;
 
             let Some(req) = GetAddrInfoRequest::parse(cmd_line) else {
                 trace!(
                     " [I] Failed to parse getaddrinfo command, falling back to transparent proxy"
                 );
-                let mut netd = pool.acquire().await?;
+                let mut netd = UnixStream::connect(real_socket).await?;
                 netd.write_cmd(cmd_line).await?;
-                let res = proxy_transparent(client, &mut netd).await;
-                pool.release(netd).await;
-                return res;
+                return proxy_transparent(client, &mut netd).await;
             };
 
             let hostname = req.hostname_str();
@@ -85,11 +84,9 @@ impl CommandHandler for GetAddrInfoHandler {
                     info!("[BLOCKED] cmd: \"{}\"", cmd_line.trim());
                 }
                 FilterAction::Allow => {
-                    let mut netd = pool.acquire().await?;
+                    let mut netd = UnixStream::connect(real_socket).await?;
                     netd.write_cmd(cmd_line).await?;
-                    let res = proxy_transparent(client, &mut netd).await;
-                    pool.release(netd).await;
-                    return res;
+                    return proxy_transparent(client, &mut netd).await;
                 }
             }
 

@@ -1,5 +1,6 @@
 use base64::{Engine, prelude::BASE64_STANDARD};
 use std::io;
+use tokio::net::UnixStream;
 use tracing::{info, trace};
 
 use crate::dns::response::raw;
@@ -21,16 +22,14 @@ impl CommandHandler for ResNsendHandler {
                 client,
                 cmd_line,
                 rules,
-                pool,
+                real_socket,
             } = ctx;
 
             let tokens: Vec<&str> = cmd_line.split_whitespace().collect();
             if tokens.len() < 4 {
-                let mut netd = pool.acquire().await?;
+                let mut netd = UnixStream::connect(real_socket).await?;
                 netd.write_cmd(cmd_line).await?;
-                let res = proxy_transparent(client, &mut netd).await;
-                pool.release(netd).await;
-                return res;
+                return proxy_transparent(client, &mut netd).await;
             }
 
             let _net_id = tokens[1];
@@ -38,19 +37,15 @@ impl CommandHandler for ResNsendHandler {
             let b64_query = tokens[3];
 
             let Ok(raw_dns) = BASE64_STANDARD.decode(b64_query) else {
-                let mut netd = pool.acquire().await?;
+                let mut netd = UnixStream::connect(real_socket).await?;
                 netd.write_cmd(cmd_line).await?;
-                let res = proxy_transparent(client, &mut netd).await;
-                pool.release(netd).await;
-                return res;
+                return proxy_transparent(client, &mut netd).await;
             };
 
             let Some(hostname) = parse_dns_query_name(&raw_dns) else {
-                let mut netd = pool.acquire().await?;
+                let mut netd = UnixStream::connect(real_socket).await?;
                 netd.write_cmd(cmd_line).await?;
-                let res = proxy_transparent(client, &mut netd).await;
-                pool.release(netd).await;
-                return res;
+                return proxy_transparent(client, &mut netd).await;
             };
 
             trace!("  hostname (resnsend): {hostname}");
@@ -65,11 +60,9 @@ impl CommandHandler for ResNsendHandler {
                     info!("[BLOCKED] cmd: \"{}\"", cmd_line.trim());
                 }
                 FilterAction::Allow => {
-                    let mut netd = pool.acquire().await?;
+                    let mut netd = UnixStream::connect(real_socket).await?;
                     netd.write_cmd(cmd_line).await?;
-                    let res = proxy_transparent(client, &mut netd).await;
-                    pool.release(netd).await;
-                    return res;
+                    return proxy_transparent(client, &mut netd).await;
                 }
             }
             Ok(())

@@ -13,10 +13,10 @@
 - **Adblock Rule Engine** — A bespoke, lightweight matcher supporting `||domain.com^` for blocking and `@@||domain.com^` for allowlist exceptions. Cosmetic and element-hiding rules are silently ignored.
 - **DNS Wire Protocol** — Parses `getaddrinfo`, `gethostbyname`, and `resnsend` (the three dnsproxyd command types), extracts the hostname, and returns a crafted NXDOMAIN response when a rule matches.
 - **DNS Cache** — In-memory, TTL-aware response cache for the built-in DNS server that reduces redundant upstream queries and saves battery.
-- **Network Change Detection** — Monitors default-route changes via netlink (WiFi ↔ mobile data handover). Flushes the DNS cache and recreates upstream sockets automatically.
+- **Network Change Detection** — Monitors default-route changes via netlink (WiFi ↔ mobile data handover) and flushes the DNS cache so stale CDN IPs from the previous network are evicted. Each DNS query and netd request creates a fresh socket, so there are no lingering connections to recreate.
 - **Hot Reload** — Watches rule files via inotify and atomically swaps in new rulesets without restarting.
 - **Daemon Mode** — Supports daemonization, PID files, and rolling log retention.
-- **Battery Saver** — Optional mode that shrinks the DNS cache, limits netd connections, and reduces worker threads for lower power consumption.
+- **Battery Saver** — Optional mode that shrinks the DNS cache for lower power consumption.
 - **Flexible Configuration** — CLI arguments > TOML config file > hardcoded defaults, merged by precedence.
 
 ---
@@ -85,7 +85,7 @@ Options:
       --dns-server           Enable built-in DNS server (UDP/TCP)
       --dns-port <PORT>      DNS server listen port (default: 53)
       --dns-upstream <ADDR>  Upstream DNS server address (default: 8.8.8.8:53)
-      --battery-saver        Enable battery saver mode (smaller cache, fewer connections)
+      --battery-saver        Enable battery saver mode (smaller cache)
   -h, --help                 Print help
 ```
 
