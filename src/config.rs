@@ -1,22 +1,22 @@
 use serde::Deserialize;
 
 /// Base directory for anetd runtime data (logs, pid, config).
-pub const BASE_DIR: &str = "/data/adb/anetd";
+pub const BASE_DIR: &str = "/data/adb/modules/anetd";
 
 /// Log directory (subdirectory of BASE_DIR).
-pub const LOG_DIR: &str = "/data/adb/anetd/log";
+pub const LOG_DIR: &str = "/data/adb/modules/anetd/log";
 
 /// Default config file path.
-pub const DEFAULT_CONFIG_FILE: &str = "/data/adb/anetd/config.toml";
+pub const DEFAULT_CONFIG_FILE: &str = "/data/adb/modules/anetd/config.toml";
 
 /// Stdout log file path.
-pub const PATH_OUT: &str = "/data/adb/anetd/log/anetd.out";
+pub const PATH_OUT: &str = "/data/adb/modules/anetd/log/anetd.out";
 
 /// Stderr log file path.
-pub const PATH_ERR: &str = "/data/adb/anetd/log/anetd.err";
+pub const PATH_ERR: &str = "/data/adb/modules/anetd/log/anetd.err";
 
 /// PID file path.
-pub const PATH_PID: &str = "/data/adb/anetd/log/anetd.pid";
+pub const PATH_PID: &str = "/data/adb/modules/anetd/log/anetd.pid";
 
 /// The proxy socket path that clients connect to.
 pub const PROXY_SOCKET: &str = "/dev/socket/dnsproxyd";
