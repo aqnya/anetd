@@ -191,3 +191,4 @@ This project is released under the [GNU General Public License v3.0](LICENSE).
 
 - [Adblock Plus Filter Syntax](https://help.adblockplus.org/hc/en-us/articles/360062733293-How-to-write-filters)
 - [AOSP netd / DnsProxyListener](https://cs.android.com/android/platform/superproject/+/android-latest-release:packages/modules/Connectivity/staticlibs/netd/libnetdutils/include/netdutils/ResponseCode.h)
+- [Adguard-Home-For-Magisk-Mod](https://github.com/liuzq2002/Adguard-Home-For-Magisk-Mod)
