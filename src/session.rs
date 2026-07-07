@@ -89,7 +89,10 @@ mod tests {
     async fn read_cmd_line_normal() {
         // Normal NUL-terminated command
         let (mut client, mut server) = tokio::io::duplex(64);
-        server.write_all(b"getaddrinfo example.com ^ 0 0 0 0 0\0").await.unwrap();
+        server
+            .write_all(b"getaddrinfo example.com ^ 0 0 0 0 0\0")
+            .await
+            .unwrap();
         drop(server); // close write side so read sees EOF after the message
 
         let raw = read_cmd_line(&mut client).await.unwrap();

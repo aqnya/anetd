@@ -64,3 +64,20 @@ pub fn setup_signals() {
         }
     }
 }
+
+#[test]
+fn test_signal_handler_safety() {
+    use crate::config::PROXY_SOCKET;
+    use crate::config::REAL_SOCKET;
+    assert_eq!(
+        PROXY_SOCKET.as_bytes(),
+        &PROXY_SOCKET_C[..PROXY_SOCKET_C.len() - 1]
+    );
+    assert_eq!(
+        REAL_SOCKET.as_bytes(),
+        &REAL_SOCKET_C[..REAL_SOCKET_C.len() - 1]
+    );
+
+    assert_eq!(PROXY_SOCKET_C.last(), Some(&0));
+    assert_eq!(REAL_SOCKET_C.last(), Some(&0));
+}
