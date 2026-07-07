@@ -1,5 +1,6 @@
 use std::io;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tracing::warn;
 
 /// Maximum DNS payload size (RFC 1035 limits UDP DNS to 512 bytes,
 /// but TCP DNS and extended responses can be up to 65535 bytes).
@@ -21,7 +22,13 @@ pub async fn write_len_and_data(
     w: &mut (impl tokio::io::AsyncWrite + Unpin),
     data: &[u8],
 ) -> io::Result<()> {
-    let len = i32::try_from(data.len()).unwrap_or(0);
+    let len = i32::try_from(data.len()).unwrap_or_else(|_| {
+        warn!(
+            "write_len_and_data: data length {} exceeds i32::MAX, writing 0",
+            data.len()
+        );
+        0
+    });
     write_be32(w, len).await?;
     if len > 0 {
         w.write_all(data).await?;

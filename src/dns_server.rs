@@ -5,6 +5,7 @@ use std::sync::Arc;
 use arc_swap::ArcSwap;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream, UdpSocket};
+use tokio::sync::Semaphore;
 use tracing::{error, info, warn};
 
 use crate::dns::cache::{DnsCache, parse_query_type};
@@ -19,6 +20,10 @@ const MAX_UDP_DNS_SIZE: usize = 512;
 
 /// Upstream forward timeout (seconds).
 const UPSTREAM_TIMEOUT_SECS: u64 = 10;
+
+/// Maximum number of concurrent in-flight DNS queries (UDP + TCP combined).
+/// Limits memory and task pressure under excessive query load.
+const MAX_CONCURRENT_QUERIES: usize = 256;
 
 /// Run the DNS server, listening on `bind_addr` and forwarding allowed queries
 /// to the upstream DNS server at `upstream`.  Responses are cached in
@@ -41,10 +46,14 @@ pub async fn run(
     let tcp_listener = TcpListener::bind(bind_addr).await?;
     info!("DNS server (TCP) listening on {}", bind_addr);
 
+    // Shared semaphore to cap in-flight queries and bound memory/task pressure.
+    let sem = Arc::new(Semaphore::new(MAX_CONCURRENT_QUERIES));
+
     let udp_handle = {
         let udp = udp_socket.clone();
         let upstream = upstream;
         let dns_cache: &'static DnsCache = dns_cache;
+        let sem = Arc::clone(&sem);
         tokio::spawn(async move {
             let mut buf = vec![0u8; MAX_UDP_DNS_SIZE];
             loop {
@@ -54,7 +63,11 @@ pub async fn run(
                         let r = rules.load_full();
                         let udp = udp.clone();
                         let cache = dns_cache;
-                        tokio::spawn(serve_udp(udp, src, query, cache, upstream, r));
+                        let sem = sem.clone();
+                        tokio::spawn(async move {
+                            let _permit = sem.acquire_owned().await;
+                            serve_udp(udp, src, query, cache, upstream, r).await;
+                        });
                     }
                     Err(e) => error!("DNS UDP recv error: {e}"),
                 }
@@ -64,13 +77,18 @@ pub async fn run(
 
     let tcp_handle = {
         let dns_cache: &'static DnsCache = dns_cache;
+        let sem = Arc::clone(&sem);
         tokio::spawn(async move {
             loop {
                 match tcp_listener.accept().await {
                     Ok((stream, src)) => {
                         let r = rules.load_full();
                         let cache = dns_cache;
-                        tokio::spawn(serve_tcp(stream, src, cache, upstream, r));
+                        let sem = sem.clone();
+                        tokio::spawn(async move {
+                            let _permit = sem.acquire_owned().await;
+                            serve_tcp(stream, src, cache, upstream, r).await;
+                        });
                     }
                     Err(e) => error!("DNS TCP accept error: {e}"),
                 }

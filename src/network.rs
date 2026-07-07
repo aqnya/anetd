@@ -12,8 +12,6 @@ use std::thread;
 use tokio::sync::Notify;
 use tracing::{info, warn};
 
-// ── netlink constants ──────────────────────────────────────────────────
-
 const AF_NETLINK: libc::c_int = 16;
 const NETLINK_ROUTE: libc::c_int = 0;
 
