@@ -29,8 +29,9 @@ unsafe extern "C" fn on_exit_signal(_: libc::c_int) {
 /// * `SIGINT` / `SIGTERM` → restore original dnsproxyd socket, then exit.
 pub fn setup_signals() {
     unsafe {
-        // `sa.sa_flags` = 0 gives SA_RESTART semantics on Linux/Bionic,
-        // which is fine for our use case.
+        // sa_flags = 0 means NO SA_RESTART — interrupted syscalls return
+        // EINTR.  This is harmless here because on_exit_signal calls _exit(0)
+        // and never returns, so there is nothing to "restart".
         let mut sa: libc::sigaction = std::mem::zeroed();
 
         // On Android/Bionic the handler field is `sa_sigaction` (cf. Linux kernel
