@@ -1,21 +1,29 @@
-use std::ffi::CString;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::config::{PROXY_SOCKET, REAL_SOCKET};
+// NUL-terminated byte-string duplicates of PROXY_SOCKET / REAL_SOCKET
+// (see crate::config).
+// We avoid CString in the signal handler because both panic and allocator-free
+// are not async-signal-safe.
+//
+// These must stay in sync with the &str constants in config.rs.  If those
+// change these will need updating — the mismatch will be obvious when the
+// socket paths don't match at runtime.
+const PROXY_SOCKET_C: &[u8] = b"/dev/socket/dnsproxyd\0";
+const REAL_SOCKET_C: &[u8] = b"/dev/socket/dnsproxyd_real\0";
 
 pub static ORIGINAL_SOCKET_RENAMED: AtomicBool = AtomicBool::new(false);
 
 /// Async-signal-safe cleanup handler: restores the original dnsproxyd socket
-/// and exits.  Uses only `libc::unlink`, `libc::rename` and `libc::_exit` —
-/// all of which are async-signal-safe per POSIX.1-2001.
+/// and exits.  Every call in this function (unlink, rename, _exit) is
+/// async-signal-safe per POSIX.1-2001.  No allocation, no formatting, no lock.
 unsafe extern "C" fn on_exit_signal(_: libc::c_int) {
     if ORIGINAL_SOCKET_RENAMED.load(Ordering::SeqCst) {
-        // SAFETY: PROXY_SOCKET and REAL_SOCKET are constants without interior NULs.
-        let proxy = CString::new(PROXY_SOCKET).unwrap();
-        let real = CString::new(REAL_SOCKET).unwrap();
         unsafe {
-            libc::unlink(proxy.as_ptr());
-            libc::rename(real.as_ptr(), proxy.as_ptr());
+            libc::unlink(PROXY_SOCKET_C.as_ptr() as *const libc::c_char);
+            libc::rename(
+                REAL_SOCKET_C.as_ptr() as *const libc::c_char,
+                PROXY_SOCKET_C.as_ptr() as *const libc::c_char,
+            );
         }
     }
     unsafe {
