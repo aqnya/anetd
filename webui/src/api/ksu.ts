@@ -57,7 +57,12 @@ function safeExec(cmd: string): ExecResult {
     dlog("info", "ksu.real exec: " + cmd.slice(0, 80));
     const r = globalThis.ksu.exec(cmd);
     dlog("info", "ksu.real exec OK: errno=" + r.errno + " stdout_len=" + (r.stdout?.length || 0));
-    return r;
+    // Normalize: native ksu.exec may return an object without stdout/stderr
+    return {
+      errno: r.errno ?? -1,
+      stdout: r.stdout ?? "",
+      stderr: r.stderr ?? "",
+    };
   } catch (e: any) {
     dlog("err", "ksu.exec CRASHED: " + (e?.message || e) + " | cmd=" + cmd.slice(0, 60));
     return { errno: -1, stdout: "", stderr: e?.message || String(e) };
