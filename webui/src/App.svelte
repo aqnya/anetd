@@ -1,14 +1,12 @@
 <script lang="ts">
   import Dashboard from "./pages/Dashboard.svelte";
-  import Rules from "./pages/Rules.svelte";
   import Settings from "./pages/Settings.svelte";
   import Logs from "./pages/Logs.svelte";
 
-  type Page = "dashboard" | "rules" | "settings" | "logs";
+  type Page = "dashboard" | "settings" | "logs";
 
   const tabs: { id: Page; label: string }[] = [
     { id: "dashboard", label: "Dashboard" },
-    { id: "rules", label: "Rules" },
     { id: "settings", label: "Settings" },
     { id: "logs", label: "Logs" },
   ];
@@ -34,8 +32,6 @@
 <main>
   {#if current === "dashboard"}
     <Dashboard />
-  {:else if current === "rules"}
-    <Rules />
   {:else if current === "settings"}
     <Settings />
   {:else if current === "logs"}
