@@ -37,12 +37,18 @@ impl CommandHandler for ResNsendHandler {
             let b64_query = tokens[3];
 
             let Ok(raw_dns) = BASE64_STANDARD.decode(b64_query) else {
+                trace!(
+                    " [I] Failed to decode base64 in resnsend command, falling back to transparent proxy"
+                );
                 let mut netd = UnixStream::connect(real_socket).await?;
                 netd.write_cmd(cmd_line).await?;
                 return proxy_transparent(client, &mut netd).await;
             };
 
             let Some(hostname) = parse_dns_query_name(&raw_dns) else {
+                trace!(
+                    " [I] Failed to parse DNS query name in resnsend command, falling back to transparent proxy"
+                );
                 let mut netd = UnixStream::connect(real_socket).await?;
                 netd.write_cmd(cmd_line).await?;
                 return proxy_transparent(client, &mut netd).await;
