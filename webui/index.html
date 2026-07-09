@@ -5,17 +5,91 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="dark light" />
   <title>Anetd — Network Rules</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- DEBUG: Google Fonts skipped to rule out network-blocking-render -->
   <link rel="stylesheet" href="/src/style.css" />
+  <style>
+    /* DEBUG: visible fallback so white screen can't hide */
+    #debug-banner {
+      position: fixed; inset: 0; z-index: 99999;
+      background: #0f172a; color: #f1f5f9;
+      font-family: monospace; font-size: 12px;
+      padding: 16px; overflow-y: auto;
+      white-space: pre-wrap; word-break: break-all;
+      line-height: 1.6;
+    }
+    #debug-banner .step { color: #22c55e; }
+    #debug-banner .warn { color: #f59e0b; }
+    #debug-banner .err  { color: #ef4444; }
+    #debug-banner .info { color: #94a3b8; }
+    #debug-banner hr { border-color: #334155; margin: 8px 0; }
+  </style>
   <script>
-    // Prevent FOUC on page load — read stored theme before paint
+    // ── DEBUG: capture everything before the app mounts ──
     (function() {
-      const stored = localStorage.getItem('anetd-theme');
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const theme = stored || (prefersDark ? 'dark' : 'light');
-      document.documentElement.setAttribute('data-theme', theme);
+      var start = Date.now();
+      var logs = [];
+
+      function add(cls, msg) {
+        logs.push([cls, (Date.now() - start) + 'ms', msg]);
+      }
+
+      // Expose globally so main.ts / App.svelte can write to it
+      window.__DEBUG = { logs: logs, add: add };
+
+      // 1. Environment
+      add('step', '=== DEBUG: page load started ===');
+      add('info', 'origin: ' + location.origin);
+      add('info', 'protocol: ' + location.protocol);
+      add('info', 'href: ' + location.href);
+      add('info', 'userAgent: ' + navigator.userAgent);
+      add('info', 'globalThis.ksu present: ' + (typeof globalThis.ksu !== 'undefined'));
+      if (typeof globalThis.ksu !== 'undefined') {
+        add('info', 'ksu type: ' + typeof globalThis.ksu);
+        try { add('info', 'ksu keys: ' + JSON.stringify(Object.keys(globalThis.ksu))); } catch(e) {}
+      }
+
+      // 2. Theme inline script (wrapped in try/catch)
+      try {
+        add('step', '=== inline theme script ===');
+        var stored;
+        try {
+          stored = localStorage.getItem('anetd-theme');
+          add('info', 'localStorage OK, stored=' + stored);
+        } catch(e) {
+          add('warn', 'localStorage threw: ' + e.message);
+          stored = null;
+        }
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        add('info', 'prefersDark: ' + prefersDark);
+        var theme = stored || (prefersDark ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+        add('info', 'theme set to: ' + theme);
+      } catch(e) {
+        add('err', 'theme script crashed: ' + e.message + '\\n' + e.stack);
+      }
+
+      // 3. Global error handlers
+      window.addEventListener('error', function(e) {
+        add('err', 'GLOBAL ERROR: ' + e.message + ' @ ' + e.filename + ':' + e.lineno + ':' + e.colno);
+        if (e.error && e.error.stack) add('err', e.error.stack);
+      });
+      window.addEventListener('unhandledrejection', function(e) {
+        add('err', 'UNHANDLED REJECTION: ' + (e.reason && e.reason.message || e.reason));
+        if (e.reason && e.reason.stack) add('err', e.reason.stack);
+      });
+
+      // 4. Render debug banner after a short delay (in case app doesn't mount)
+      setTimeout(function() {
+        if (document.getElementById('app') && document.getElementById('app').children.length === 0) {
+          add('warn', '=== app still empty after timeout, rendering debug ===');
+          var div = document.createElement('div');
+          div.id = 'debug-banner';
+          div.innerHTML = logs.map(function(row) {
+            return '<span class="' + row[0] + '">[' + row[1] + '] ' + row[2] + '</span>';
+          }).join('<br>');
+          document.body.appendChild(div);
+        }
+      }, 2000);
     })();
   </script>
 </head>

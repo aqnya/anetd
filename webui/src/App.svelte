@@ -5,6 +5,10 @@
   import Logs from "./pages/Logs.svelte";
   import ThemeToggle from "./lib/ThemeToggle.svelte";
 
+  // ── DEBUG ──
+  const dbg = (window as any).__DEBUG;
+  if (dbg) dbg.add("step", "=== App.svelte module loaded ===");
+
   type Page = "dashboard" | "rules" | "settings" | "logs";
 
   interface NavItem {
@@ -27,7 +31,11 @@
   // Initialize theme from DOM (set by inline script in index.html)
   $effect(() => {
     theme = document.documentElement.getAttribute("data-theme") ?? "dark";
+    if (dbg) dbg.add("info", "App $effect: theme=" + theme);
   });
+
+  // DEBUG: log when App mounts
+  if (dbg) dbg.add("step", "=== App.svelte component initialized ===");
 
   function navigate(page: Page) {
     current = page;
