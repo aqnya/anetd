@@ -15,8 +15,8 @@
 
 #define MODDIR        "/data/adb/modules/anetd"
 #define PID_FILE      MODDIR "/log/anetd.pid"
-#define RULES_DIR     "/data/adb/anetd/rules"
-#define CONFIG_FILE   "/data/adb/anetd/config.toml"
+#define RULES_DIR    MODDIR "/rules"
+#define CONFIG_FILE  MODDIR "/config.toml"
 #define STATE_FILE    MODDIR "/log/dns_off"
 #define LOG_FILE      MODDIR "/log/anetd.log"
 #define TOGGLE_SCRIPT MODDIR "/toggle.sh"
