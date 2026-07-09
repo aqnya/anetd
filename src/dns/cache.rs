@@ -78,15 +78,14 @@ impl DnsCache {
             entries.retain(|_, e| e.expires_at > Instant::now());
         }
         // If still at capacity, evict LRU-style (earliest expiry).
-        if entries.len() >= self.max_entries {
-            if let Some(oldest_key) = entries
+        if entries.len() >= self.max_entries
+            && let Some(oldest_key) = entries
                 .iter()
                 .min_by_key(|(_, e)| e.expires_at)
                 .map(|(k, _)| k.clone())
             {
                 entries.remove(&oldest_key);
             }
-        }
 
         entries.insert(
             key,

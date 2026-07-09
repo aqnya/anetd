@@ -102,11 +102,10 @@ async fn wait_for_socket_inotify(path: &str) -> Result<(), Box<dyn std::error::E
         let event = event_res?;
         if event.mask.contains(EventMask::CREATE) || event.mask.contains(EventMask::MOVED_TO) {
             // Check if this event is about our target file.
-            if let Some(name) = event.name {
-                if name == file_name && std::path::Path::new(path).exists() {
+            if let Some(name) = event.name
+                && name == file_name && std::path::Path::new(path).exists() {
                     return Ok(());
                 }
-            }
         }
     }
 
@@ -179,14 +178,13 @@ pub async fn init(args: &Args) -> io::Result<()> {
                 Ok((client, _addr)) => {
                     let rules = store.load_full();
                     tokio::spawn(async move {
-                        if let Err(e) = handle_client(client, rules, REAL_SOCKET).await {
-                            if e.kind() != ErrorKind::UnexpectedEof
+                        if let Err(e) = handle_client(client, rules, REAL_SOCKET).await
+                            && e.kind() != ErrorKind::UnexpectedEof
                                 && e.kind() != ErrorKind::BrokenPipe
                                 && e.kind() != ErrorKind::ConnectionReset
                             {
                                 error!("[client error] {e}");
                             }
-                        }
                     });
                 }
                 Err(e) => error!("[accept error] {e}"),

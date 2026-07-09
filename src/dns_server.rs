@@ -51,7 +51,6 @@ pub async fn run(
 
     let udp_handle = {
         let udp = udp_socket.clone();
-        let upstream = upstream;
         let dns_cache: &'static DnsCache = dns_cache;
         let sem = Arc::clone(&sem);
         tokio::spawn(async move {
