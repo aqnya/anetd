@@ -16,21 +16,20 @@
   }
 </script>
 
-<div class="page">
-  <h2>Logs</h2>
-  <p class="subtitle">Recent log entries from anetd daemon</p>
-  <button class="btn" onclick={refresh}>Refresh</button>
-  <button class="btn btn-secondary" style="margin-left:8px" onclick={handleClear}>
-    Clear Logs
-  </button>
+<h1 class="page-title">Logs</h1>
+<p class="page-subtitle">Recent log entries from anetd daemon</p>
 
-  <div class="log-viewer">
-    {#if lines.length === 0}
-      <div class="empty">No log entries</div>
-    {:else}
-      {#each lines as line}
-        <div class="log-line">{line}</div>
-      {/each}
-    {/if}
-  </div>
+<div class="log-toolbar">
+  <button class="btn" onclick={refresh}>Refresh</button>
+  <button class="btn btn-secondary" onclick={handleClear}>Clear Logs</button>
+</div>
+
+<div class="log-viewer">
+  {#if lines.length === 0}
+    <div class="empty">No log entries</div>
+  {:else}
+    {#each lines as line}
+      <div class="log-line">{line}</div>
+    {/each}
+  {/if}
 </div>

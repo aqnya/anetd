@@ -31,37 +31,35 @@
   }
 </script>
 
-<div class="page">
-  <h2>Rules</h2>
-  <p class="subtitle">{blockCount} block rules, {allowCount} allow rules loaded</p>
-  <button class="btn" onclick={handleRefresh}>Refresh</button>
+<h1 class="page-title">Rules</h1>
+<p class="page-subtitle">{blockCount} blocked, {allowCount} allowed &middot; {entries.length} entries total</p>
+<button class="btn" onclick={handleRefresh}>Refresh</button>
 
-  <div class="rule-table-wrap">
-    <table class="rule-table">
-      <thead>
+<div class="rule-table-wrap">
+  <table class="rule-table">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Rule</th>
+      </tr>
+    </thead>
+    <tbody>
+      {#if entries.length === 0}
         <tr>
-          <th></th>
-          <th>Rule</th>
+          <td colspan="2" class="empty">No rules loaded</td>
         </tr>
-      </thead>
-      <tbody>
-        {#if entries.length === 0}
-          <tr>
-            <td colspan="2" class="empty">No rules loaded</td>
+      {:else}
+        {#each entries as entry}
+          <tr class="rule-{entry.type}">
+            <td class="rule-badge">
+              {#if ruleLabel(entry.type)}
+                <span class="mini-badge rule-{entry.type}">{ruleLabel(entry.type)}</span>
+              {/if}
+            </td>
+            <td class="rule-text">{entry.raw || " "}</td>
           </tr>
-        {:else}
-          {#each entries as entry}
-            <tr class="rule-{entry.type}">
-              <td class="rule-badge">
-                {#if ruleLabel(entry.type)}
-                  <span class="mini-badge rule-{entry.type}">{ruleLabel(entry.type)}</span>
-                {/if}
-              </td>
-              <td class="rule-text">{entry.raw || " "}</td>
-            </tr>
-          {/each}
-        {/if}
-      </tbody>
-    </table>
-  </div>
+        {/each}
+      {/if}
+    </tbody>
+  </table>
 </div>
