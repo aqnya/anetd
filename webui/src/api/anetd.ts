@@ -117,7 +117,7 @@ export function reloadRules(): boolean {
 
 /** Toggle DNS filtering on/off (action.sh equivalent). */
 export function toggleFilter(): boolean {
-  const r = sh(`sh "${MODDIR}/action.sh"`);
+  const r = sh(`sh "${MODDIR}/toggle.sh"`);
   return r.errno === 0;
 }
 
