@@ -1,18 +1,23 @@
 <script lang="ts">
-  import { loadConfig, saveConfig } from "../api/anetd";
+  import { loadConfig, saveConfig } from "../api/anetd_wasm";
   import { ksu } from "../api/ksu";
 
-  let config: string = $state(loadConfig());
+  let config: string = $state("");
   let dirty: boolean = $state(false);
 
-  function handleSave() {
-    const ok = saveConfig(config);
+  async function initConfig() {
+    config = await loadConfig();
+  }
+  initConfig();
+
+  async function handleSave() {
+    const ok = await saveConfig(config);
     ksu.toast(ok ? "Config saved & reloaded" : "Save failed");
     if (ok) dirty = false;
   }
 
-  function handleReset() {
-    config = loadConfig();
+  async function handleReset() {
+    config = await loadConfig();
     dirty = false;
   }
 

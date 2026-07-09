@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { loadLogs } from "../api/anetd";
+  import { loadLogs } from "../api/anetd_wasm";
   import { ksu } from "../api/ksu";
 
   let lines: string[] = $state([]);
 
-  function refresh() {
-    lines = loadLogs(200);
+  async function refresh() {
+    lines = await loadLogs(200);
   }
   refresh();
 

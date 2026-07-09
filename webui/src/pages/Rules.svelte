@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { loadRules, reloadRules } from "../api/anetd";
-  import type { RuleEntry } from "../api/anetd";
+  import { loadRules, reloadRules, type RuleEntry } from "../api/anetd_wasm";
   import { ksu } from "../api/ksu";
 
   let entries: RuleEntry[] = $state([]);
@@ -8,8 +7,8 @@
   const blockCount = $derived(entries.filter((e) => e.type === "block").length);
   const allowCount = $derived(entries.filter((e) => e.type === "allow").length);
 
-  function refresh() {
-    entries = loadRules();
+  async function refresh() {
+    entries = await loadRules();
   }
   refresh();
 
@@ -24,9 +23,9 @@
     }
   }
 
-  function handleRefresh() {
-    reloadRules();
-    refresh();
+  async function handleRefresh() {
+    await reloadRules();
+    await refresh();
     ksu.toast("Rules reloaded");
   }
 </script>

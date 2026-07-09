@@ -67,6 +67,11 @@ jobs:
         run: npm run typecheck
         working-directory: webui
 
+      - name: Install Emscripten
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq emscripten
+
       - name: Build webui
         run: npm run build
         working-directory: webui

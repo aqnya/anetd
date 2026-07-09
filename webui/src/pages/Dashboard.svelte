@@ -1,32 +1,32 @@
 <script lang="ts">
-  import { getStatus, toggleFilter, reloadRules } from "../api/anetd";
+  import { getStatus, toggleFilter, reloadRules, type AnetdStatus } from "../api/anetd_wasm";
   import { ksu } from "../api/ksu";
-  import type { AnetdStatus } from "../api/anetd";
 
-  let status: AnetdStatus = $state(getStatus());
+  let status: AnetdStatus = $state({ running: false, pid: null, dnsFilterEnabled: true, uptime: "\u2014" });
 
-  function refresh() {
-    status = getStatus();
+  async function refresh() {
+    status = await getStatus();
   }
+  refresh();
 
-  function handleToggleFilter() {
-    const ok = toggleFilter();
+  async function handleToggleFilter() {
+    const ok = await toggleFilter();
     ksu.toast(ok ? "Filter toggled" : "Toggle failed");
-    refresh();
+    await refresh();
   }
 
-  function handleReloadRules() {
-    const ok = reloadRules();
+  async function handleReloadRules() {
+    const ok = await reloadRules();
     ksu.toast(ok ? "Rules reloaded" : "Reload failed");
-    refresh();
+    await refresh();
   }
 
-  function handleRestart() {
+  async function handleRestart() {
     const result = ksu.exec(
       "kill -TERM $(cat /data/adb/modules/anetd/log/anetd.pid) 2>/dev/null; sleep 1; sh /data/adb/modules/anetd/post-fs-data.sh",
     );
     ksu.toast(result.errno === 0 ? "Restarted" : "Restart failed");
-    setTimeout(refresh, 1500);
+    setTimeout(() => refresh(), 1500);
   }
 </script>
 
