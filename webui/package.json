@@ -7,15 +7,14 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "svelte-check --tsconfig ./tsconfig.json",
     "preview": "vite preview"
   },
   "devDependencies": {
-    "esbuild": "^0.28.1",
-    "typescript": "^7.0.2",
-    "vite": "^8.1.4"
-  },
-  "allowScripts": {
-    "esbuild@0.28.1": true
+    "@sveltejs/vite-plugin-svelte": "^6.2.4",
+    "svelte": "^5.44.1",
+    "svelte-check": "^4.7.2",
+    "typescript": "^5.8.3",
+    "vite": "^7.1.4"
   }
 }
