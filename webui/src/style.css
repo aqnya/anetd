@@ -1,0 +1,358 @@
+/* === anetd WebUI Stylesheet === */
+
+:root {
+  --bg: #0d1117;
+  --bg-card: #161b22;
+  --bg-card-hover: #1c2129;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-dim: #8b949e;
+  --accent: #58a6ff;
+  --accent-dim: #1f6feb;
+  --green: #3fb950;
+  --red: #f85149;
+  --orange: #d29922;
+  --purple: #a371f7;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: "SFMono-Regular", "Cascadia Code", "Fira Code", monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 15px;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  line-height: 1.5;
+  min-height: 100dvh;
+}
+
+/* === Header === */
+
+#nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.brand {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+#tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.tab {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  font-family: var(--font);
+}
+
+.tab:hover {
+  color: var(--text);
+  background: var(--bg);
+}
+
+.tab.active {
+  color: var(--text);
+  background: var(--accent-dim);
+}
+
+/* === Main === */
+
+main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 20px 16px 40px;
+}
+
+h2 {
+  font-size: 1.4rem;
+  margin-bottom: 4px;
+}
+
+.subtitle {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  margin-bottom: 16px;
+}
+
+.subtitle code {
+  background: var(--bg-card);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 0.85em;
+}
+
+/* === Cards === */
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.card-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.card-body {
+  padding: 12px 16px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.stat-row:last-child {
+  border-bottom: none;
+}
+
+.stat-row .label {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+/* === Badges === */
+
+.badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.badge.on {
+  background: rgba(63, 185, 80, 0.15);
+  color: var(--green);
+}
+
+.badge.off {
+  background: rgba(248, 81, 73, 0.15);
+  color: var(--red);
+}
+
+/* === Buttons === */
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  display: inline-block;
+  padding: 8px 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.88rem;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--text-dim);
+}
+
+.btn:active {
+  background: var(--bg-card);
+}
+
+.btn-danger {
+  border-color: rgba(248, 81, 73, 0.3);
+  color: var(--red);
+}
+
+.btn-danger:hover {
+  background: rgba(248, 81, 73, 0.08);
+  border-color: var(--red);
+}
+
+.btn-secondary {
+  color: var(--text-dim);
+}
+
+/* === Rule Table === */
+
+.rule-table-wrap {
+  overflow-x: auto;
+  margin-top: 12px;
+}
+
+.rule-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+}
+
+.rule-table th {
+  text-align: left;
+  padding: 6px 8px;
+  color: var(--text-dim);
+  font-weight: 500;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border);
+}
+
+.rule-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.rule-table tr:last-child td {
+  border-bottom: none;
+}
+
+.rule-badge {
+  width: 60px;
+  white-space: nowrap;
+}
+
+.mini-badge {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1.5;
+}
+
+.rule-block .mini-badge {
+  background: rgba(248, 81, 73, 0.15);
+  color: var(--red);
+}
+
+.rule-allow .mini-badge {
+  background: rgba(63, 185, 80, 0.15);
+  color: var(--green);
+}
+
+.rule-comment .rule-text,
+.rule-header .rule-text,
+.rule-blank .rule-text,
+.rule-inline-comment .rule-text {
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+.rule-header .rule-text {
+  font-weight: 600;
+  font-style: normal;
+  color: var(--purple);
+}
+
+.rule-text {
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
+.empty {
+  color: var(--text-dim);
+  text-align: center;
+  padding: 24px 0;
+}
+
+/* === Settings === */
+
+textarea {
+  width: 100%;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.ref-block {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  line-height: 1.6;
+  background: var(--bg);
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+/* === Logs === */
+
+.log-viewer {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  max-height: 60vh;
+  overflow-y: auto;
+  margin-top: 12px;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1.7;
+}
+
+.log-line {
+  color: var(--text-dim);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
