@@ -45,9 +45,7 @@ jobs:
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
           mkdir -p dist
           cp target/aarch64-linux-android/release/anetd dist/
-          cp module/module.prop dist/
-          cp module/post-fs-data.sh dist/
-          cp -r module/rules dist/
+          cp -r module/* dist/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6
