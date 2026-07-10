@@ -35,21 +35,13 @@
     setTimeout(() => refresh(), 1500);
   }
 
-  async function handleExportDebug() {
-    try {
-      const debug = await getStatusDebug();
-      const blob = new Blob([JSON.stringify(debug, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `anetd-debug-${Date.now()}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-      ksu.toast("Debug info exported");
-    } catch (e: any) {
-      ksu.toast("Export failed: " + (e?.message || e));
-    }
-  }
+ async function handleExportDebug() {
+  const debug = await getStatusDebug();
+  const json = JSON.stringify(debug, null, 2);
+  const path = `/sdcard/Download/anetd-debug-${Date.now()}.json`;
+  ksu.exec(`echo '${json}' > ${path}`);
+  ksu.toast(`Saved to ${path}`);
+}
 </script>
 
 <h1 class="page-title">Dashboard</h1>

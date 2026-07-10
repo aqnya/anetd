@@ -35,8 +35,6 @@ function sendJson<T>(method: string, extra?: Record<string, unknown>): T {
   }
 }
 
-// ── Types ──────────────────────────────────────────
-
 export interface AnetdStatus {
   running: boolean;
   pid: number | null;
@@ -67,8 +65,6 @@ export interface ReloadResponse {
   block_rules: number;
   allow_rules: number;
 }
-
-// ── Exported API ───────────────────────────────────
 
 export async function getStatus(): Promise<AnetdStatus> {
   const s = sendJson<StatusResponse>("get_status");
