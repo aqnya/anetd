@@ -227,6 +227,94 @@ char* get_status(void) {
     return strdup(buf);
 }
 
+/**
+ * Debug version of get_status: returns raw intermediate values
+ * from each shell call so problems can be diagnosed.
+ */
+EMSCRIPTEN_KEEPALIVE
+char* get_status_debug(void) {
+    StringBuilder sb;
+    sb_init(&sb, 2048);
+    sb_append(&sb, "{");
+
+    /* 1. PID file exists? */
+    char* pid_file_test = sh_stdout("[ -f \"" PID_FILE "\" ] && echo 'yes' || echo 'no'");
+    sb_append(&sb, "\"pidFileExists\":");
+    sb_append_escaped(&sb, pid_file_test ? pid_file_test : "null");
+
+    /* 2. PID file content */
+    char* pid_raw = sh_stdout("cat \"" PID_FILE "\" 2>/dev/null");
+    int pid = atoi(pid_raw);
+    sb_append(&sb, ",\"pidRaw\":");
+    sb_append_escaped(&sb, pid_raw ? pid_raw : "");
+    sb_append(&sb, ",\"pidParsed\":");
+    {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%d", pid);
+        sb_append(&sb, buf);
+    }
+
+    /* 3. Process check */
+    int ps_ok = 0;
+    char* ps_raw = strdup("");
+    if (pid > 0) {
+        char cmd[128];
+        snprintf(cmd, sizeof(cmd), "ps -p %d -o pid= 2>/dev/null", pid);
+        free(ps_raw);
+        ps_raw = sh_stdout(cmd);
+        char* t = ps_raw;
+        while (*t == ' ' || *t == '\t' || *t == '\n') t++;
+        int found_pid = atoi(t);
+        ps_ok = (found_pid == pid);
+    }
+    sb_append(&sb, ",\"psCheckOk\":");
+    sb_append(&sb, ps_ok ? "true" : "false");
+    sb_append(&sb, ",\"psRaw\":");
+    sb_append_escaped(&sb, ps_raw);
+    free(ps_raw);
+
+    /* 4. Uptime */
+    char* uptime_raw = strdup("\u2014");
+    if (ps_ok) {
+        char cmd[128];
+        snprintf(cmd, sizeof(cmd), "ps -p %d -o etime= 2>/dev/null", pid);
+        free(uptime_raw);
+        uptime_raw = sh_stdout(cmd);
+    }
+    sb_append(&sb, ",\"uptimeRaw\":");
+    sb_append_escaped(&sb, uptime_raw);
+    free(uptime_raw);
+
+    /* 5. DNS filter state file */
+    char* state_file_test = sh_stdout("[ -f \"" STATE_FILE "\" ] && echo 'yes' || echo 'no'");
+    sb_append(&sb, ",\"stateFileExists\":");
+    sb_append_escaped(&sb, state_file_test ? state_file_test : "null");
+    free(state_file_test);
+
+    /* 6. Log file tail */
+    char* log_tail = sh_stdout("tail -n 10 \"" LOG_FILE "\" 2>/dev/null");
+    sb_append(&sb, ",\"logTail\":");
+    sb_append_escaped(&sb, log_tail);
+    free(log_tail);
+
+    /* 7. Config file exists? */
+    char* cfg_test = sh_stdout("[ -f \"" CONFIG_FILE "\" ] && echo 'yes' || echo 'no'");
+    sb_append(&sb, ",\"configFileExists\":");
+    sb_append_escaped(&sb, cfg_test ? cfg_test : "null");
+    free(cfg_test);
+
+    /* 8. Rules dir file count */
+    char* rule_count = sh_stdout("ls -1 \"" RULES_DIR "\" 2>/dev/null | wc -l");
+    sb_append(&sb, ",\"ruleFileCount\":");
+    sb_append_escaped(&sb, rule_count ? rule_count : "0");
+    free(rule_count);
+
+    free(pid_raw);
+
+    sb_append(&sb, "}");
+    return sb_detach(&sb);
+}
+
 static const char* classify_rule(const char* line, const char* trimmed) {
     if (!trimmed[0]) return "blank";
     if (trimmed[0] == '!') return "comment";

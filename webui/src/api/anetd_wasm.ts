@@ -22,6 +22,7 @@ export interface RuleEntry {
 
 interface AnetdWasmRaw {
   _get_status(): number;
+  _get_status_debug(): number;
   _load_rules(): number;
   _reload_rules(): number;
   _toggle_filter(): number;
@@ -81,6 +82,27 @@ async function callInt(fn: () => Promise<number>): Promise<number> {
 export async function getStatus(): Promise<AnetdStatus> {
   const m = await getMod();
   return callJson(() => Promise.resolve(m._get_status()));
+}
+
+/**
+ * Get debug status info — raw intermediate values from each shell call.
+ * Useful for diagnosing why the status display is broken.
+ */
+export async function getStatusDebug(): Promise<Record<string, unknown>> {
+  const m = await getMod();
+  return callJson(() => Promise.resolve(m._get_status_debug()));
+}
+
+/**
+ * Get raw log text (not JSON-parsed) for file export.
+ */
+export async function getLogsRaw(lines: number = 500): Promise<string> {
+  const m = await getMod();
+  const ptr = m._load_logs(lines);
+  const json = await strFromPtr(ptr);
+  // Re-parse to extract the raw lines as a text blob
+  const arr: string[] = JSON.parse(json);
+  return arr.join("\n");
 }
 
 export async function loadRules(): Promise<RuleEntry[]> {

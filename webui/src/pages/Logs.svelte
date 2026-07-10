@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { loadLogs } from "../api/anetd_wasm";
+  import { loadLogs, getLogsRaw } from "../api/anetd_wasm";
   import { ksu } from "../api/ksu";
 
   let lines: string[] = $state([]);
@@ -14,6 +14,22 @@
     refresh();
     ksu.toast("Logs cleared");
   }
+
+  async function handleExportLogs() {
+    try {
+      const text = await getLogsRaw(2000);
+      const blob = new Blob([text], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `anetd-log-${Date.now()}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+      ksu.toast("Log file exported");
+    } catch (e: any) {
+      ksu.toast("Export failed: " + (e?.message || e));
+    }
+  }
 </script>
 
 <h1 class="page-title">Logs</h1>
@@ -22,6 +38,7 @@
 <div class="log-toolbar">
   <button class="btn" onclick={refresh}>Refresh</button>
   <button class="btn btn-secondary" onclick={handleClear}>Clear Logs</button>
+  <button class="btn btn-secondary" onclick={handleExportLogs}>Export Log File</button>
 </div>
 
 <div class="log-viewer">

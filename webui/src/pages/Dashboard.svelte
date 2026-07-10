@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getStatus, toggleFilter, reloadRules, type AnetdStatus } from "../api/anetd_wasm";
+  import { getStatus, getStatusDebug, toggleFilter, reloadRules, type AnetdStatus } from "../api/anetd_wasm";
   import { ksu } from "../api/ksu";
 
   let status: AnetdStatus = $state({ running: false, pid: null, dnsFilterEnabled: true, uptime: "\u2014" });
@@ -27,6 +27,22 @@
     );
     ksu.toast(result.errno === 0 ? "Restarted" : "Restart failed");
     setTimeout(() => refresh(), 1500);
+  }
+
+  async function handleExportDebug() {
+    try {
+      const debug = await getStatusDebug();
+      const blob = new Blob([JSON.stringify(debug, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `anetd-debug-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      ksu.toast("Debug info exported");
+    } catch (e: any) {
+      ksu.toast("Export failed: " + (e?.message || e));
+    }
   }
 </script>
 
@@ -103,6 +119,7 @@
       <button class="btn" onclick={handleToggleFilter}>Toggle Filter</button>
       <button class="btn" onclick={handleReloadRules}>Reload Rules</button>
       <button class="btn btn-danger" onclick={handleRestart}>Restart Daemon</button>
+      <button class="btn btn-secondary" onclick={handleExportDebug}>Export Debug Info</button>
     </div>
   </div>
 </div>
