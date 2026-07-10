@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::io;
 use std::pin::Pin;
-use std::sync::{Arc, OnceLock};
 use std::sync::atomic::AtomicU64;
+use std::sync::{Arc, OnceLock};
 use tokio::net::UnixStream;
 
 use crate::rules::RuleSet;

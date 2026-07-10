@@ -9,14 +9,14 @@
 use std::io::{self, BufRead, BufReader, Write};
 use std::os::unix::net::{UnixListener as StdUnixListener, UnixStream};
 use std::path::Path;
-use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
+use std::sync::atomic::AtomicU64;
 
 use arc_swap::ArcSwap;
 use tracing::{error, info};
 
-use crate::rules::loader::load_rules;
 use crate::rules::RuleSet;
+use crate::rules::loader::load_rules;
 
 /// Run the Web UI Unix socket server.
 ///
@@ -53,13 +53,9 @@ pub fn run(
             Ok(mut conn) => {
                 let rules_path = rules_path.clone();
                 std::thread::spawn(move || {
-                    if let Err(e) = handle_conn(
-                        &mut conn,
-                        store,
-                        &rules_path,
-                        block_count,
-                        dns_queries,
-                    ) {
+                    if let Err(e) =
+                        handle_conn(&mut conn, store, &rules_path, block_count, dns_queries)
+                    {
                         error!("[webui] connection error: {e}");
                     }
                 });
@@ -90,27 +86,15 @@ fn handle_conn(
             let rules = store.load();
             format!(
                 "{{\"running\":true,\"blocked\":{},\"dns_queries\":{},\
-                 \"rules_count\":{},\"block_rules\":{},\"allow_rules\":{}}}\n",
-                block_count.load(std::sync::atomic::Ordering::Relaxed),
-                dns_queries.load(std::sync::atomic::Ordering::Relaxed),
-                rules.watched_files.len(),
-                rules.block_count(),
-                rules.allow_count(),
-            )
-        }
-
-        "get_status_debug" => {
-            let rules = store.load();
-            format!(
-                "{{\"running\":true,\"blocked\":{},\"dns_queries\":{},\
                  \"rules_count\":{},\"block_rules\":{},\"allow_rules\":{},
-                 \"pid\":null,\"uptime\":\"\",\
+                 \"pid\":{},\"uptime\":\"\",\
                  \"dnsFilterEnabled\":{}}}\n",
                 block_count.load(std::sync::atomic::Ordering::Relaxed),
                 dns_queries.load(std::sync::atomic::Ordering::Relaxed),
                 rules.watched_files.len(),
                 rules.block_count(),
                 rules.allow_count(),
+                std::process::id(),
                 !rules.block_count() > 0 || rules.allow_count() > 0,
             )
         }
@@ -215,10 +199,7 @@ fn parse_method(line: &str) -> &str {
 /// Extract a string field from a simple JSON object line.
 fn extract_json_str<'a>(line: &'a str, key: &str) -> Option<&'a str> {
     let search = format!("\"{key}\"");
-    line.split(&search)
-        .nth(1)?
-        .split('"')
-        .nth(1)
+    line.split(&search).nth(1)?.split('"').nth(1)
 }
 
 /// Extract a u64 field from a simple JSON object line.

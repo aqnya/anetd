@@ -11,7 +11,7 @@ use tracing::{error, info, warn};
 use crate::dns::cache::{DnsCache, parse_query_type};
 use crate::dns::nxdomain::make_nxdomain_response;
 use crate::dns::wire::parse_dns_query_name;
-use crate::handlers::{format_pseudo_url, DNS_QUERIES};
+use crate::handlers::{DNS_QUERIES, format_pseudo_url};
 use crate::network::NetworkMonitor;
 use crate::rules::{FilterAction, RuleSet};
 

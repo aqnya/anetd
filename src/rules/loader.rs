@@ -35,13 +35,14 @@ fn collect_files_and_hashes(path_str: &str, files: &mut Vec<(String, String)>) {
             files.push((path_str.to_string(), hash_str));
         }
     } else if path.is_dir()
-        && let Ok(entries) = std::fs::read_dir(path) {
-            for entry in entries.flatten() {
-                if let Some(s) = entry.path().to_str() {
-                    collect_files_and_hashes(s, files);
-                }
+        && let Ok(entries) = std::fs::read_dir(path)
+    {
+        for entry in entries.flatten() {
+            if let Some(s) = entry.path().to_str() {
+                collect_files_and_hashes(s, files);
             }
         }
+    }
 }
 
 pub fn load_rules(path_str: &str) -> RuleSet {

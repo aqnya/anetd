@@ -9,8 +9,6 @@
 
 import { ksu } from "./ksu";
 
-// ── Socket path ────────────────────────────────────
-
 const SOCKET = "/data/adb/modules/anetd/webui.sock";
 
 function send(method: string, extra?: Record<string, unknown>): string {
@@ -75,10 +73,6 @@ export async function getStatus(): Promise<AnetdStatus> {
     dnsFilterEnabled: s.dnsFilterEnabled ?? true,
     uptime: s.uptime || `${(s.blocked ?? 0)} blocked`,
   };
-}
-
-export async function getStatusDebug(): Promise<Record<string, unknown>> {
-  return sendJson("get_status_debug");
 }
 
 export async function loadRules(): Promise<RuleFile[]> {

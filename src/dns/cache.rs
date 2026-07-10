@@ -83,9 +83,9 @@ impl DnsCache {
                 .iter()
                 .min_by_key(|(_, e)| e.expires_at)
                 .map(|(k, _)| k.clone())
-            {
-                entries.remove(&oldest_key);
-            }
+        {
+            entries.remove(&oldest_key);
+        }
 
         entries.insert(
             key,

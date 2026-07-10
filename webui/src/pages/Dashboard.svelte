@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getStatus, getStatusDebug, toggleFilter, reloadRules, type AnetdStatus } from "../api/anetd";
+  import { getStatus, toggleFilter, reloadRules, type AnetdStatus } from "../api/anetd";
   import { ksu } from "../api/ksu";
 
   let status: AnetdStatus = $state({ running: false, pid: null, dnsFilterEnabled: true, uptime: "\u2014" });
@@ -36,7 +36,7 @@
   }
 
  async function handleExportDebug() {
-  const debug = await getStatusDebug();
+  const debug = await getStatus();
   const json = JSON.stringify(debug, null, 2);
   const path = `/sdcard/Download/anetd-debug-${Date.now()}.json`;
   ksu.exec(`echo '${json}' > ${path}`);
