@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getStatus, getStatusDebug, toggleFilter, reloadRules, type AnetdStatus } from "../api/anetd_wasm";
+  import { getStatus, getStatusDebug, toggleFilter, reloadRules, type AnetdStatus } from "../api/anetd";
   import { ksu } from "../api/ksu";
 
   let status: AnetdStatus = $state({ running: false, pid: null, dnsFilterEnabled: true, uptime: "\u2014" });
@@ -16,8 +16,14 @@
   }
 
   async function handleReloadRules() {
-    const ok = await reloadRules();
-    ksu.toast(ok ? "Rules reloaded" : "Reload failed");
+    try {
+      const r = await reloadRules();
+      ksu.toast(r.ok
+        ? `Reloaded: ${r.rules_count} files (${r.block_rules}B/${r.allow_rules}A)`
+        : "Reload failed");
+    } catch (e: any) {
+      ksu.toast("Reload failed: " + (e?.message || e));
+    }
     await refresh();
   }
 
@@ -51,7 +57,6 @@
 
 <div class="card">
   <div class="card-header">
-    <!-- Activity icon -->
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
@@ -73,7 +78,7 @@
     </div>
     <div class="stat-row">
       <span class="stat-label">PID</span>
-      <span class="stat-value">{status.pid ?? "—"}</span>
+      <span class="stat-value">{status.pid ?? "\u2014"}</span>
     </div>
     <div class="stat-row">
       <span class="stat-label">Uptime</span>
@@ -84,7 +89,6 @@
 
 <div class="card">
   <div class="card-header">
-    <!-- Shield icon -->
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
@@ -107,7 +111,6 @@
 
 <div class="card">
   <div class="card-header">
-    <!-- Zap icon -->
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>

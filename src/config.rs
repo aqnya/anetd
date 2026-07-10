@@ -30,6 +30,9 @@ pub const DNS_SERVER_PORT: u16 = 53;
 /// Default upstream DNS server address.
 pub const DNS_UPSTREAM: &str = "8.8.8.8:53";
 
+/// Default path for the web UI Unix socket.
+pub const WEBUI_SOCKET: &str = "/data/adb/modules/anetd/webui.sock";
+
 /// Settings loadable from a TOML configuration file.
 ///
 /// All fields are optional; CLI arguments override file values.
@@ -57,6 +60,10 @@ pub struct ConfigFile {
     /// reduced worker threads.
     #[serde(default)]
     pub battery_saver: bool,
+
+    /// Path for the web UI Unix socket.
+    #[serde(default = "default_webui_socket")]
+    pub webui_socket: String,
 }
 
 fn default_dns_port() -> u16 {
@@ -65,6 +72,10 @@ fn default_dns_port() -> u16 {
 
 fn default_dns_upstream() -> String {
     DNS_UPSTREAM.to_string()
+}
+
+fn default_webui_socket() -> String {
+    WEBUI_SOCKET.to_string()
 }
 
 /// Load configuration from a TOML file.

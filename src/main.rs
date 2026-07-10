@@ -8,6 +8,7 @@ mod logging;
 mod network;
 mod rules;
 mod server;
+mod webui;
 
 pub mod protocol;
 pub mod session;

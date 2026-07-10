@@ -11,7 +11,7 @@ use tracing::{error, info, warn};
 use crate::dns::cache::{DnsCache, parse_query_type};
 use crate::dns::nxdomain::make_nxdomain_response;
 use crate::dns::wire::parse_dns_query_name;
-use crate::handlers::format_pseudo_url;
+use crate::handlers::{format_pseudo_url, DNS_QUERIES};
 use crate::network::NetworkMonitor;
 use crate::rules::{FilterAction, RuleSet};
 
@@ -140,6 +140,7 @@ async fn serve_udp_inner(
     upstream_addr: SocketAddr,
     rules: &RuleSet,
 ) -> io::Result<()> {
+    DNS_QUERIES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let hostname = parse_dns_query_name(query);
 
     match hostname {
@@ -188,6 +189,7 @@ async fn serve_tcp_inner(
     upstream_addr: SocketAddr,
     rules: &RuleSet,
 ) -> io::Result<()> {
+    DNS_QUERIES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let mut len_buf = [0u8; 2];
     stream.read_exact(&mut len_buf).await?;
     let msg_len = u16::from_be_bytes(len_buf) as usize;

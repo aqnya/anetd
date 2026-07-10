@@ -5,7 +5,7 @@ use tracing::{info, trace};
 
 use crate::dns::response::raw;
 use crate::dns::wire::parse_dns_query_name;
-use crate::handlers::{CommandCtx, CommandHandler, format_pseudo_url};
+use crate::handlers::{CommandCtx, CommandHandler, format_pseudo_url, BLOCKED_COUNT};
 use crate::protocol::ProtoWrite;
 use crate::rules::FilterAction;
 use crate::session::proxy_transparent;
@@ -63,6 +63,7 @@ impl CommandHandler for ResNsendHandler {
             match &action {
                 FilterAction::Block => {
                     raw::send_block(client, &raw_dns).await?;
+                    BLOCKED_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     info!("[BLOCKED] cmd: \"{}\"", cmd_line.trim());
                 }
                 FilterAction::Allow => {

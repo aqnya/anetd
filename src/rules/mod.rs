@@ -1,5 +1,5 @@
 mod adblock;
-mod loader;
+pub(crate) mod loader;
 mod watcher;
 
 pub use adblock::{FilterAction, RuleSet};

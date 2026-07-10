@@ -42,11 +42,6 @@
       add('info', 'protocol: ' + location.protocol);
       add('info', 'href: ' + location.href);
       add('info', 'userAgent: ' + navigator.userAgent);
-      add('info', 'globalThis.ksu present: ' + (typeof globalThis.ksu !== 'undefined'));
-      if (typeof globalThis.ksu !== 'undefined') {
-        add('info', 'ksu type: ' + typeof globalThis.ksu);
-        try { add('info', 'ksu keys: ' + JSON.stringify(Object.keys(globalThis.ksu))); } catch(e) {}
-      }
 
       // 2. Theme inline script (wrapped in try/catch)
       try {

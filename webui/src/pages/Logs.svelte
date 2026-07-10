@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { loadLogs, getLogsRaw } from "../api/anetd_wasm";
+  import { loadLogs, getLogsRaw } from "../api/anetd";
   import { ksu } from "../api/ksu";
 
   let lines: string[] = $state([]);
@@ -15,7 +15,7 @@
     ksu.toast("Logs cleared");
   }
 
-  async function handleExportLogs() {
+  async function handleExport() {
     try {
       const text = await getLogsRaw(2000);
       const blob = new Blob([text], { type: "text/plain" });
@@ -38,7 +38,7 @@
 <div class="log-toolbar">
   <button class="btn" onclick={refresh}>Refresh</button>
   <button class="btn btn-secondary" onclick={handleClear}>Clear Logs</button>
-  <button class="btn btn-secondary" onclick={handleExportLogs}>Export Log File</button>
+  <button class="btn btn-secondary" onclick={handleExport}>Export Log File</button>
 </div>
 
 <div class="log-viewer">

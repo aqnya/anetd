@@ -1,4 +1,4 @@
-use crate::config::{self, DEFAULT_CONFIG_FILE, DNS_SERVER_PORT, DNS_UPSTREAM};
+use crate::config::{self, DEFAULT_CONFIG_FILE, DNS_SERVER_PORT, DNS_UPSTREAM, WEBUI_SOCKET};
 
 #[derive(Debug)]
 pub struct Args {
@@ -23,6 +23,9 @@ pub struct Args {
     /// Enable battery saver mode: smaller cache, single netd connection,
     /// reduced worker threads.
     pub battery_saver: bool,
+
+    /// Path for the web UI Unix socket.
+    pub webui_socket: String,
 }
 
 fn print_help() {
@@ -38,6 +41,7 @@ Options:
       --dns-port <PORT>      DNS server listen port (default: 53)
       --dns-upstream <ADDR>  Upstream DNS server address (default: 8.8.8.8:53)
       --battery-saver        Enable battery saver mode (smaller cache, fewer connections)
+      --webui-socket <PATH> Path for web UI Unix socket (default: /data/adb/modules/anetd/webui.sock)
   -h, --help                 Print help"
     );
 }
@@ -61,6 +65,7 @@ pub fn parse_args() -> Args {
     let mut dns_upstream: Option<String> = None;
     let mut battery_saver = false;
     let mut battery_saver_set = false;
+    let mut webui_socket: Option<String> = None;
 
     let mut it = std::env::args().skip(1);
     while let Some(arg) = it.next() {
@@ -133,6 +138,16 @@ pub fn parse_args() -> Args {
                 battery_saver = true;
                 battery_saver_set = true;
             }
+            "--webui-socket" => {
+                let val = it.next().unwrap_or_else(|| {
+                    eprintln!("error: --webui-socket requires a value");
+                    std::process::exit(1);
+                });
+                webui_socket = Some(val);
+            }
+            s if s.starts_with("--webui-socket=") => {
+                webui_socket = Some(s["--webui-socket=".len()..].to_string());
+            }
             "-h" | "--help" => {
                 print_help();
                 std::process::exit(0);
@@ -171,6 +186,9 @@ pub fn parse_args() -> Args {
         if !battery_saver_set {
             battery_saver = cf.battery_saver;
         }
+        if webui_socket.is_none() {
+            webui_socket = Some(cf.webui_socket);
+        }
     } else if config_file.is_some() {
         // Explicit --config-file that failed to load → fatal.
         eprintln!("error: failed to load config file '{}'", file_path);
@@ -197,5 +215,6 @@ pub fn parse_args() -> Args {
         dns_port: dns_port.unwrap_or(DNS_SERVER_PORT),
         dns_upstream: dns_upstream.unwrap_or_else(|| DNS_UPSTREAM.to_string()),
         battery_saver,
+        webui_socket: webui_socket.unwrap_or_else(|| WEBUI_SOCKET.to_string()),
     }
 }

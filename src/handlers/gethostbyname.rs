@@ -3,7 +3,7 @@ use tokio::net::UnixStream;
 use tracing::{info, trace};
 
 use crate::dns::response::addrinfo;
-use crate::handlers::{CommandCtx, CommandHandler, format_pseudo_url};
+use crate::handlers::{CommandCtx, CommandHandler, format_pseudo_url, BLOCKED_COUNT};
 use crate::protocol::ProtoWrite;
 use crate::rules::FilterAction;
 use crate::session::proxy_transparent;
@@ -43,6 +43,7 @@ impl CommandHandler for GetHostByNameHandler {
             match &action {
                 FilterAction::Block => {
                     addrinfo::send_nxdomain(client).await?;
+                    BLOCKED_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     info!("[BLOCKED] cmd: \"{}\"", cmd_line.trim());
                 }
                 FilterAction::Allow => {

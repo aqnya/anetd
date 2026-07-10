@@ -12,6 +12,7 @@ use crate::cli::Args;
 use crate::config::{PROXY_SOCKET, REAL_SOCKET};
 use crate::dns::cache::DnsCache;
 use crate::dns_server;
+use crate::handlers::{BLOCKED_COUNT, DNS_QUERIES};
 use crate::network::NetworkMonitor;
 use crate::rules::{RuleSet, load_rules, spawn_reload_watcher};
 use crate::session::handle_client;
@@ -123,6 +124,23 @@ pub async fn init(args: &Args) -> io::Result<()> {
     static DNS_CACHE: std::sync::OnceLock<DnsCache> = std::sync::OnceLock::new();
     let cache =
         DNS_CACHE.get_or_init(|| DnsCache::new(if args.battery_saver { 512 } else { 2048 }));
+
+    // Spawn web UI Unix socket server (JSON-line protocol for KSU app).
+    {
+        let rules_path = args.rules.clone();
+        let socket_path = args.webui_socket.clone();
+        std::thread::spawn(move || {
+            if let Err(e) = crate::webui::run(
+                &socket_path,
+                store,
+                rules_path,
+                &BLOCKED_COUNT,
+                &DNS_QUERIES,
+            ) {
+                error!("[webui] fatal error: {e}");
+            }
+        });
+    }
 
     if args.dns_server {
         // Network monitor: detects WiFi ↔ mobile-data handover via netlink.

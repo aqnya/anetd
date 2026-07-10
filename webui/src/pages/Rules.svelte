@@ -1,61 +1,53 @@
 <script lang="ts">
-  import { loadRules, reloadRules, type RuleEntry } from "../api/anetd_wasm";
+  import { loadRules, reloadRules, type RuleFile } from "../api/anetd";
   import { ksu } from "../api/ksu";
 
-  let entries: RuleEntry[] = $state([]);
+  let entries: RuleFile[] = $state([]);
 
-  const blockCount = $derived(entries.filter((e) => e.type === "block").length);
-  const allowCount = $derived(entries.filter((e) => e.type === "allow").length);
+  const fileCount = $derived(entries.length);
 
   async function refresh() {
     entries = await loadRules();
   }
   refresh();
 
-  function ruleLabel(t: RuleEntry["type"]): string {
-    switch (t) {
-      case "block": return "BLOCK";
-      case "allow": return "ALLOW";
-      case "comment": return "#";
-      case "header": return "HDR";
-      case "inline-comment": return "+#";
-      case "blank": return "";
+  async function handleReload() {
+    try {
+      const r = await reloadRules();
+      await refresh();
+      ksu.toast(r.ok ? `Reloaded: ${r.rules_count} files` : "Reload failed");
+    } catch (e: any) {
+      ksu.toast("Reload failed: " + (e?.message || e));
     }
-  }
-
-  async function handleRefresh() {
-    await reloadRules();
-    await refresh();
-    ksu.toast("Rules reloaded");
   }
 </script>
 
 <h1 class="page-title">Rules</h1>
-<p class="page-subtitle">{blockCount} blocked, {allowCount} allowed &middot; {entries.length} entries total</p>
-<button class="btn" onclick={handleRefresh}>Refresh</button>
+<p class="page-subtitle">{fileCount} rule files loaded</p>
 
-<div class="rule-table-wrap">
+<div class="actions">
+  <button class="btn btn-primary" onclick={handleReload}>Reload Rules</button>
+  <button class="btn" onclick={refresh}>Refresh</button>
+</div>
+
+<div class="rule-table-wrap" style="margin-top:16px">
   <table class="rule-table">
     <thead>
       <tr>
-        <th>Type</th>
-        <th>Rule</th>
+        <th>Path</th>
+        <th>SHA-256</th>
       </tr>
     </thead>
     <tbody>
       {#if entries.length === 0}
         <tr>
-          <td colspan="2" class="empty">No rules loaded</td>
+          <td colspan="2" class="empty">No rule files loaded</td>
         </tr>
       {:else}
         {#each entries as entry}
-          <tr class="rule-{entry.type}">
-            <td class="rule-badge">
-              {#if ruleLabel(entry.type)}
-                <span class="mini-badge rule-{entry.type}">{ruleLabel(entry.type)}</span>
-              {/if}
-            </td>
-            <td class="rule-text">{entry.raw || " "}</td>
+          <tr>
+            <td class="rule-text" style="font-family:var(--mono);font-size:var(--font-size-xs)">{entry.path}</td>
+            <td style="font-family:var(--mono);font-size:0.7rem;color:var(--text-dim)">{entry.hash}</td>
           </tr>
         {/each}
       {/if}

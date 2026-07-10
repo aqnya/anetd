@@ -3,6 +3,7 @@ use std::future::Future;
 use std::io;
 use std::pin::Pin;
 use std::sync::{Arc, OnceLock};
+use std::sync::atomic::AtomicU64;
 use tokio::net::UnixStream;
 
 use crate::rules::RuleSet;
@@ -10,6 +11,11 @@ use crate::rules::RuleSet;
 pub mod getaddrinfo;
 pub mod gethostbyname;
 pub mod resnsend;
+
+/// Global counter: total blocked DNS/hostname requests.
+pub static BLOCKED_COUNT: AtomicU64 = AtomicU64::new(0);
+/// Global counter: total DNS queries served (used in DNS server mode).
+pub static DNS_QUERIES: AtomicU64 = AtomicU64::new(0);
 
 pub struct CommandCtx<'a> {
     pub client: &'a mut UnixStream,

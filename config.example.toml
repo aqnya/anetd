@@ -1,9 +1,11 @@
-   rules = "/data/adb/anetd/rules"
-   standalone = false
-   multi_thread = true
-   dns_server = true
-   dns_port = 53
-   dns_upstream = "8.8.8.8:53"
-   # Enable battery saver: smaller DNS cache, single netd connection,
-   # reduced worker threads.
-   battery_saver = false
+rules = "/data/adb/anetd/rules"
+standalone = false
+multi_thread = true
+dns_server = true
+dns_port = 53
+dns_upstream = "8.8.8.8:53"
+# Enable battery saver: smaller DNS cache, single netd connection,
+# reduced worker threads.
+battery_saver = false
+# Path for the web UI Unix socket.
+webui_socket = "/data/adb/modules/anetd/webui.sock"
