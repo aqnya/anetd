@@ -139,48 +139,6 @@ The original socket is restored on process exit (`SIGINT` / `SIGTERM`).
 
 ---
 
-## Directory Layout
-
-```
-src/
-├── main.rs         Entry point
-├── cli.rs          CLI argument parsing & config merging
-├── config.rs       Constants & TOML config loading
-├── daemon.rs       Daemonization
-├── logging.rs      Logging setup (console / rolling file)
-├── network.rs      Netlink route monitoring for network change detection
-├── server.rs       Main server loop (socket hijack / DNS server dispatch)
-├── session.rs      Client session handling & transparent proxy
-├── protocol.rs     dnsproxyd wire protocol helpers
-├── signal.rs       Signal handling & socket restoration
-├── dns_server.rs   Standalone DNS server (UDP/TCP)
-├── dns/
-│   ├── mod.rs
-│   ├── cache.rs     DNS response cache (TTL-aware)
-│   ├── nxdomain.rs  NXDOMAIN response builder
-│   ├── status.rs    dnsproxyd status codes
-│   ├── wire.rs      DNS wire-format I/O
-│   └── response/
-│       ├── mod.rs
-│       ├── addrinfo.rs  getaddrinfo response builder
-│       ├── hostent.rs   gethostbyname response builder
-│       └── raw.rs       resnsend raw response builder
-├── handlers/
-│   ├── mod.rs           Command handler registry
-│   ├── getaddrinfo.rs   getaddrinfo handler
-│   ├── gethostbyname.rs gethostbyname handler
-│   └── resnsend.rs      resnsend handler
-├── rules/
-│   ├── mod.rs
-│   ├── adblock.rs  Rule matching engine
-│   ├── loader.rs   Rule file loading & compilation
-│   └── watcher.rs  inotify hot-reload watcher
-scripts/
-└── probe.py        dnsproxyd response format probe tool
-```
-
----
-
 ## License
 
 This project is released under the [GNU General Public License v3.0](LICENSE).
