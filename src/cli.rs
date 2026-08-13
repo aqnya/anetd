@@ -1,6 +1,6 @@
 use crate::config::{self, DEFAULT_CONFIG_FILE, DNS_SERVER_PORT, DNS_UPSTREAM, WEBUI_SOCKET};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Args {
     /// Path to rule file(s) or directory. Supports comma-separated values
     pub rules: String,

@@ -129,16 +129,9 @@ pub async fn init(args: &Args) -> io::Result<()> {
 
     // Spawn web UI Unix socket server (JSON-line protocol for KSU app).
     {
-        let rules_path = args.rules.clone();
-        let socket_path = args.webui_socket.clone();
+        let args = args.clone();
         std::thread::spawn(move || {
-            if let Err(e) = crate::webui::run(
-                &socket_path,
-                store,
-                rules_path,
-                &BLOCKED_COUNT,
-                &DNS_QUERIES,
-            ) {
+            if let Err(e) = crate::webui::run(&args, store, &BLOCKED_COUNT, &DNS_QUERIES) {
                 error!("[webui] fatal error: {e}");
             }
         });
